@@ -30,7 +30,6 @@ powershell -command "$host.UI.RawUI.WindowSize = New-Object System.Management.Au
 powershell -c "$obj = New-Object -ComObject WScript.Shell; 1..50 | ForEach-Object { $obj.SendKeys([char]175) }"
 cd "%userprofile%"
 start "" "https://youtu.be/xvFZjo5PgG0"
-timeout /t 1 /nobreak >nul 
-::del "%~f0"
-pause
+timeout /t 1 /nobreak >nul
+del "%~f0"
 exit
